@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KeyMix Pro</title>
+  <meta name="description" content="Análisis de tonalidad (Camelot), BPM, energía y cue points para DJs, directamente en el navegador." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%2316181f'/%3E%3Cpath d='M16 3a13 13 0 0 1 13 13h-6a7 7 0 0 0-7-7z' fill='%2334d399'/%3E%3Cpath d='M29 16a13 13 0 0 1-13 13v-6a7 7 0 0 0 7-7z' fill='%2360a5fa'/%3E%3Cpath d='M16 29A13 13 0 0 1 3 16h6a7 7 0 0 0 7 7z' fill='%23f472b6'/%3E%3Cpath d='M3 16A13 13 0 0 1 16 3v6a7 7 0 0 0-7 7z' fill='%23fbbf24'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true"></span>
+      <span class="brand-name">KeyMix <b>Pro</b></span>
+    </div>
+    <div class="actions">
+      <label class="btn primary" title="Añadir archivos de audio (A)">
+        <input id="file-input" type="file" accept="audio/*,.mp3,.wav,.flac,.m4a,.aac,.ogg,.aiff,.aif" multiple hidden />
+        <span>＋ Añadir pistas</span>
+      </label>
+      <button id="btn-folder" class="btn" hidden title="Abrir una carpeta y poder guardar etiquetas en los archivos originales">📁 Abrir carpeta</button>
+      <label class="select-label">Notación
+        <select id="notation">
+          <option value="camelot">Camelot (8A)</option>
+          <option value="openkey">Open Key (1m)</option>
+          <option value="musical">Musical (Am)</option>
+        </select>
+      </label>
+      <div class="menu">
+        <button class="btn" id="btn-export" aria-haspopup="true" aria-expanded="false">Exportar ▾</button>
+        <div class="menu-list" id="export-menu" hidden>
+          <button data-export="csv">Biblioteca como CSV</button>
+          <button data-export="json">Biblioteca como JSON</button>
+          <button data-export="tag-all">Escribir etiquetas en todos los MP3</button>
+          <hr />
+          <button data-export="clear" class="danger">Vaciar biblioteca</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" class="tab active" data-view="library" aria-selected="true">Biblioteca</button>
+    <button role="tab" class="tab" data-view="set" aria-selected="false">Constructor de sets</button>
+    <div class="queue-status" id="queue-status" aria-live="polite"></div>
+  </nav>
+
+  <main class="layout">
+    <section class="view" id="view-library">
+      <div class="toolbar">
+        <input id="search" type="search" placeholder="Buscar título, artista, tonalidad…  (/)" autocomplete="off" />
+        <label class="chip-toggle" title="Muestra solo pistas que mezclan armónicamente con la seleccionada">
+          <input type="checkbox" id="compat-only" /> <span>Solo compatibles</span>
+        </label>
+        <button class="chip" id="key-filter-chip" hidden></button>
+        <span class="count" id="track-count"></span>
+      </div>
+      <div class="table-wrap" id="table-wrap">
+        <table class="tracks" id="track-table">
+          <thead>
+            <tr>
+              <th class="c-check"><input type="checkbox" id="check-all" title="Marcar todas" /></th>
+              <th data-sort="index" class="c-num">#</th>
+              <th data-sort="title">Título</th>
+              <th data-sort="key" class="c-key">Tono</th>
+              <th data-sort="bpm" class="c-bpm">BPM</th>
+              <th data-sort="energy" class="c-energy">Energía</th>
+              <th data-sort="duration" class="c-dur">Duración</th>
+              <th class="c-status">Estado</th>
+            </tr>
+          </thead>
+          <tbody id="track-body"></tbody>
+        </table>
+        <div class="empty" id="empty-state">
+          <div class="empty-wheel" aria-hidden="true"></div>
+          <h2>Arrastra tu música aquí</h2>
+          <p>MP3, WAV, FLAC, AAC/M4A, OGG o AIFF. Todo el análisis se hace en tu navegador: los archivos nunca salen de tu equipo.</p>
+          <p class="muted">Detecta la tonalidad (rueda Camelot), el BPM, el nivel de energía 1–10 y crea hasta 8 cue points en los cambios de sección.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="view-set" hidden>
+      <div class="toolbar set-toolbar">
+        <label class="select-label">Pistas
+          <select id="set-source">
+            <option value="checked">Marcadas en la biblioteca</option>
+            <option value="all">Toda la biblioteca</option>
+          </select>
+        </label>
+        <label class="select-label">Empezar por
+          <select id="set-start"><option value="">La de menor energía</option></select>
+        </label>
+        <button class="btn primary" id="btn-build-set">Generar set armónico</button>
+        <button class="btn" id="btn-set-m3u">Exportar M3U</button>
+        <button class="btn" id="btn-set-csv">Exportar CSV</button>
+      </div>
+      <div class="set-summary" id="set-summary"></div>
+      <svg class="energy-curve" id="energy-curve" preserveAspectRatio="none" aria-label="Curva de energía del set"></svg>
+      <ol class="set-list" id="set-list"></ol>
+    </section>
+
+    <aside class="side" id="side">
+      <div class="panel wheel-panel">
+        <svg id="wheel" viewBox="-110 -110 220 220" role="img" aria-label="Rueda Camelot"></svg>
+        <p class="hint">Haz clic en un sector para filtrar por tonalidad.</p>
+      </div>
+      <div class="panel details" id="details">
+        <p class="muted">Selecciona una pista para ver su análisis.</p>
+      </div>
+    </aside>
+  </main>
+
+  <footer class="player" id="player">
+    <div class="player-info">
+      <div class="np-key" id="np-key">—</div>
+      <div class="np-text">
+        <div class="np-title" id="np-title">Sin pista</div>
+        <div class="np-meta" id="np-meta">Selecciona una pista y pulsa espacio</div>
+      </div>
+    </div>
+    <div class="player-main">
+      <div class="transport">
+        <button class="icon-btn" id="btn-start" title="Al inicio (Inicio)">⏮</button>
+        <button class="icon-btn play" id="btn-play" title="Reproducir / pausa (espacio)">▶</button>
+        <span class="time" id="time">0:00 / 0:00</span>
+        <div class="cue-buttons" id="cue-buttons"></div>
+        <input type="range" id="volume" min="0" max="1" step="0.01" value="0.9" title="Volumen" />
+      </div>
+      <canvas id="waveform" height="72"></canvas>
+    </div>
+    <audio id="audio" preload="auto"></audio>
+  </footer>
+
+  <div class="drop-overlay" id="drop-overlay" hidden><div>Suelta los archivos para analizarlos</div></div>
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
