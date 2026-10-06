@@ -1,6 +1,7 @@
 import { ANALYSIS_SAMPLE_RATE } from './dsp.js';
 import { formatKey, keyColor, compatibility, fromCamelot } from './camelot.js';
 import { readTags, writeTags } from './id3.js';
+import { makeDemoFiles } from './demo.js';
 import { buildSet, describeTransition, transitionCost, bpmDistance, pathCost } from './setbuilder.js';
 
 // ------------------------------------------------------------- Estado ----
@@ -654,6 +655,47 @@ function downloadBlob(blob, name) {
   setTimeout(() => URL.revokeObjectURL(a.href), 10000);
 }
 
+// Diálogos propios: algunos entornos (iframes aislados) bloquean confirm() y las descargas.
+function openDialog(title, body, buttons) {
+  return new Promise((resolve) => {
+    const close = (v) => { overlay.remove(); resolve(v); };
+    const overlay = el('div', { class: 'modal-overlay', onclick: (e) => { if (e.target === overlay) close(false); } },
+      el('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true', 'aria-label': title },
+        el('h3', {}, title), body,
+        el('div', { class: 'modal-actions' }, buttons.map((b) =>
+          el('button', { class: `btn ${b.primary ? 'primary' : ''} ${b.danger ? 'danger' : ''}`, onclick: () => (b.action ? b.action(close) : close(b.value)) }, b.label)))));
+    overlay.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(false); });
+    document.body.append(overlay);
+    overlay.querySelector('.modal-actions .btn:last-child')?.focus();
+  });
+}
+
+function confirmDialog(title, message, okLabel = 'Aceptar', danger = false) {
+  return openDialog(title, el('p', {}, message), [
+    { label: 'Cancelar', value: false },
+    { label: okLabel, value: true, primary: !danger, danger },
+  ]);
+}
+
+/** Muestra un texto exportable con opciones de copiar y descargar. */
+function exportText(text, filename, type) {
+  const area = el('textarea', { class: 'export-text', readonly: true, id: 'export-text', 'aria-label': filename });
+  area.value = text;
+  return openDialog(filename, el('div', {}, area), [
+    { label: 'Cerrar', value: false },
+    { label: 'Descargar', action: () => downloadBlob(new Blob([type.startsWith('text/csv') ? '\ufeff' + text : text], { type }), filename) },
+    {
+      label: 'Copiar', primary: true, action: (close) => {
+        navigator.clipboard.writeText(text).then(() => { toast('Copiado al portapapeles'); close(true); }, () => {
+          area.focus();
+          area.select();
+          toast('Selecciona el texto y cópialo con Ctrl+C');
+        });
+      },
+    },
+  ]);
+}
+
 async function tagTrack(t, { quiet = false, forceDownload = false } = {}) {
   const s = state.settings;
   const keyStr = tagKeyString(t);
@@ -698,7 +740,7 @@ async function tagAll() {
     return;
   }
   const inPlace = mp3.every((t) => t.handle) && !state.settings.renamePrefix;
-  if (!inPlace && mp3.length > 5 && !confirm(`Se descargarán ${mp3.length} archivos. Para sobrescribir los originales usa «Abrir carpeta» (Chrome/Edge). ¿Continuar?`)) return;
+  if (!inPlace && mp3.length > 5 && !(await confirmDialog('Etiquetar todos los MP3', `Se descargarán ${mp3.length} archivos. Para sobrescribir los originales usa «Abrir carpeta» (Chrome/Edge).`, 'Descargar'))) return;
   let ok = 0;
   for (const t of mp3) {
     if (await tagTrack(t, { quiet: true })) ok++;
@@ -720,8 +762,7 @@ function exportCsv(tracks, filename) {
     rows.push([i + 1, t.title, t.artist, t.name, r.key?.camelot, r.key?.openKey, r.key?.musical, r.bpm, r.energy, fmtTime(r.duration),
       r.cues.map((c, j) => `${j + 1}:${c.label}@${fmtTime(c.time)}`).join(' | ')]);
   });
-  const csv = '﻿' + rows.map((r) => r.map(csvEscape).join(',')).join('\r\n');
-  downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), filename);
+  exportText(rows.map((r) => r.map(csvEscape).join(',')).join('\r\n'), filename, 'text/csv;charset=utf-8');
 }
 
 function exportJson() {
@@ -729,7 +770,7 @@ function exportJson() {
     const { waveform, ...rest } = t.result;
     return { title: t.title, artist: t.artist, file: t.name, ...rest };
   });
-  downloadBlob(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }), 'keymix-biblioteca.json');
+  exportText(JSON.stringify(data, null, 2), 'keymix-biblioteca.json', 'application/json');
 }
 
 function exportM3u(tracks) {
@@ -737,7 +778,7 @@ function exportM3u(tracks) {
     `#EXTINF:${Math.round(t.result.duration)},${t.artist ? `${t.artist} - ` : ''}${t.title} [${t.result.key?.camelot} ${fmtBpm(t.result.bpm)}]`,
     t.name,
   ])];
-  downloadBlob(new Blob([lines.join('\n') + '\n'], { type: 'audio/x-mpegurl' }), 'keymix-set.m3u');
+  exportText(lines.join('\n') + '\n', 'keymix-set.m3u', 'audio/x-mpegurl');
 }
 
 // ------------------------------------------------- Constructor de sets ----
@@ -1019,7 +1060,8 @@ function bindEvents() {
     if (action === 'csv') exportCsv(done(), 'keymix-biblioteca.csv');
     if (action === 'json') exportJson();
     if (action === 'tag-all') tagAll();
-    if (action === 'clear' && confirm('¿Vaciar la biblioteca? Se borrarán los análisis guardados (tus archivos no se tocan).')) {
+    if (action === 'clear') confirmDialog('Vaciar biblioteca', 'Se borrarán los análisis guardados. Tus archivos no se tocan.', 'Vaciar', true).then((ok) => {
+      if (!ok) return;
       queue.length = 0;
       state.tracks = state.tracks.filter((t) => t.status === 'decoding' || t.status === 'analyzing');
       state.set = [];
@@ -1029,7 +1071,7 @@ function bindEvents() {
       state.playingId = null;
       save();
       render();
-    }
+    });
   });
 
   document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => switchView(b.dataset.view)));
@@ -1193,9 +1235,23 @@ function bindEvents() {
   });
 }
 
+function loadDemo() {
+  toast('Generando pistas de demostración…');
+  setTimeout(() => addFiles(makeDemoFiles()), 30);
+}
+
 // ---------------------------------------------------------------- Init ----
 
 load();
+$('#btn-demo').addEventListener('click', loadDemo);
+let firstVisit = true;
+try {
+  firstVisit = !localStorage.getItem('keymix.visited');
+  localStorage.setItem('keymix.visited', '1');
+} catch {
+  // sin almacenamiento: se trata como primera visita
+}
+if (!state.tracks.length && firstVisit) loadDemo();
 if (state.tracks.length) state.selectedId = state.tracks[0].id;
 bindEvents();
 render();

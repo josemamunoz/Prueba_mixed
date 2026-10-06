@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { analyzeTrack } from '../js/dsp.js';
-import { synthTrack } from './synth.mjs';
+import { synthTrack } from '../js/synth.js';
 
 // Progresión i–iv–V–i en La menor: Am, Dm, E, Am.
 const A_MINOR = [[57, 60, 64], [57, 62, 65], [56, 59, 64], [57, 60, 64]];
