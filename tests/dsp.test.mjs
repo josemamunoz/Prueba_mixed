@@ -56,3 +56,12 @@ test('una pista más fuerte y rápida tiene más energía', () => {
 test('rechaza audio demasiado corto', () => {
   assert.throws(() => analyzeTrack(new Float32Array(1000)));
 });
+
+test('energía: referencia real de deep house (Frink - Deeply) da energía baja', async () => {
+  const { energyFromFeatures } = await import('../js/dsp.js');
+  // Medidas reportadas por la app para «Frink - Deeply (Original Mix)»: el usuario la considera de baja energía.
+  const deep = energyFromFeatures({ loudnessDb: -10.2, onsetsPerSec: 5.3, centroidHz: 1469, fullness: 0.43, bpm: 124 });
+  assert.equal(deep.level, 4);
+  const bright = energyFromFeatures({ loudnessDb: -8, onsetsPerSec: 7, centroidHz: 3000, fullness: 0.8, bpm: 130 });
+  assert.ok(bright.level >= 7, `techno brillante: ${bright.level}`);
+});

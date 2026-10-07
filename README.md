@@ -48,7 +48,7 @@ Todo el análisis es JavaScript sin dependencias (`js/dsp.js`) y se ejecuta en W
 2. **Tempo**: flujo espectral → autocorrelación con refuerzo de armónicos → comprobación de doble tempo → afinado con un filtro peine sobre toda la pista (pasos de 0,02 BPM). La fase se ajusta con el flujo de graves (el bombo).
 3. **Tonalidad**: FFT de 16 384 puntos, detección de picos espectrales con interpolación, estimación de la afinación global, cromagrama con refuerzo de la línea de bajo y correlación con los perfiles de Krumhansl-Kessler y Temperley.
 4. **Rejilla y cues**: volumen y graves por beat, primer tiempo del compás elegido por la nitidez de los cambios entre compases y detección de novedad (±8 compases) con preferencia por los límites de frase.
-5. **Energía**: combinación ponderada de volumen activo, densidad de ataques, centroide espectral, BPM y proporción de secciones intensas.
+5. **Energía**: combinación ponderada de brillo (30 %), volumen activo (20 %), tempo dentro del rango de baile (20 %), densidad de ataques (15 %) y proporción de secciones intensas (15 %), con una curva que reserva los niveles altos. Calibrada con una referencia real de deep house; el panel de detalle muestra el desglose de cada pista.
 
 > Los algoritmos de Mixed In Key son propietarios. Este proyecto usa técnicas públicas de MIR, así que los resultados (sobre todo el nivel de energía, que es heurístico) pueden diferir en algunas pistas.
 

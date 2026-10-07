@@ -1,4 +1,4 @@
-import { ANALYSIS_SAMPLE_RATE } from './dsp.js';
+import { ANALYSIS_SAMPLE_RATE, energyFromFeatures } from './dsp.js';
 import { formatKey, keyColor, compatibility, fromCamelot } from './camelot.js';
 import { readTags, writeTags } from './id3.js';
 import { isAiff, parseAiff, encodeWav } from './aiff.js';
@@ -95,6 +95,12 @@ function serializeTrack(t) {
 
 function deserializeTrack(o) {
   const r = o.result;
+  // Recalcula la energía con la fórmula actual si la pista guardó sus medidas.
+  const e = r.energyDetail;
+  if (e?.centroidHz != null && e.fullness != null) {
+    r.energyDetail = energyFromFeatures({ ...e, bpm: r.bpm });
+    r.energy = r.energyDetail.level;
+  }
   return {
     ...o, status: 'done', progress: 1, file: null, handle: null,
     result: { ...r, waveform: Object.fromEntries(Object.entries(r.waveform).map(([k, v]) => [k, b64.dec(v)])) },
@@ -691,16 +697,17 @@ function energyBreakdown(r) {
   if (!e.parts) {
     return el('p', { class: 'hint' }, `Volumen activo ${e.loudnessDb ?? '?'} dBFS · ${e.onsetsPerSec ?? '?'} ataques/s. Vuelve a analizar la pista (Vaciar biblioteca y añadirla de nuevo) para ver el desglose completo.`);
   }
+  const w = e.weights || { L: 40, D: 15, C: 15, B: 15, F: 15 };
   const rows = [
-    ['Volumen', `${e.loudnessDb} dBFS`, e.parts.L, 40],
-    ['Golpes', `${e.onsetsPerSec} /s`, e.parts.D, 15],
-    ['Brillo', `${e.centroidHz} Hz`, e.parts.C, 15],
-    ['Tempo', `${fmtBpm(r.bpm)} BPM`, e.parts.B, 15],
-    ['Plenitud', `${Math.round(e.fullness * 100)} %`, e.parts.F, 15],
+    ['Volumen', `${e.loudnessDb} dBFS`, e.parts.L, w.L],
+    ['Golpes', `${e.onsetsPerSec} /s`, e.parts.D, w.D],
+    ['Brillo', `${e.centroidHz} Hz`, e.parts.C, w.C],
+    ['Tempo', `${fmtBpm(r.bpm)} BPM`, e.parts.B, w.B],
+    ['Plenitud', `${Math.round(e.fullness * 100)} %`, e.parts.F, w.F],
   ];
   return el('div', { class: 'energy-breakdown' },
     rows.map(([name, raw, part, w]) => el('div', { class: 'eb-row', title: `Aporta ${(part * w / 100).toFixed(3)} a la puntuación (peso ${w} %)` },
-      el('span', { class: 'eb-name' }, name),
+      el('span', { class: 'eb-name' }, `${name} ${w} %`),
       el('span', { class: 'eb-raw' }, raw),
       el('span', { class: 'eb-bar' }, el('i', { style: `width:${Math.round(part * 100)}%` })),
       el('span', { class: 'eb-val' }, part.toFixed(2)))),

@@ -296,7 +296,7 @@ table.tracks { width: 100%; border-collapse: collapse; }
 .tag-box .btn { justify-content: center; margin-top: 4px; }
 
 .energy-breakdown { display: grid; gap: 4px; font-size: 12px; }
-.eb-row { display: grid; grid-template-columns: 62px 74px minmax(0, 1fr) 32px; gap: 8px; align-items: center; }
+.eb-row { display: grid; grid-template-columns: 92px 74px minmax(0, 1fr) 32px; gap: 8px; align-items: center; }
 .eb-name { color: var(--muted); }
 .eb-raw, .eb-val { font-variant-numeric: tabular-nums; }
 .eb-val { text-align: right; }

@@ -488,22 +488,36 @@ function estimateEnergy(feat, bpm, duration) {
   }
   const density = onsets / Math.max(1, duration);
 
-  const L = clamp01((loudDb + 24) / 17);
-  const D = clamp01(density / 7);
-  const C = clamp01((centroid - 700) / 2800);
-  const B = clamp01((bpm - 70) / 105);
+  return energyFromFeatures({ loudnessDb: loudDb, onsetsPerSec: density, centroidHz: centroid, fullness, bpm });
+}
+
+/**
+ * Nivel de energía 1-10 a partir de las medidas de la pista. Separado del análisis para poder
+ * recalcular pistas ya analizadas cuando cambia la fórmula.
+ *
+ * Calibración: los másteres modernos suenan todos fuertes, así que el volumen pesa poco y lo que
+ * más distingue es el brillo (un deep house es oscuro, un peak-time techno brillante) y el tempo
+ * dentro del rango de baile. La curva final (^1,3) reserva los valores altos para pistas que
+ * puntúan alto en casi todo. Referencia: «Frink - Deeply» (deep house, 124 BPM, energía baja) → 4.
+ */
+export function energyFromFeatures({ loudnessDb, onsetsPerSec, centroidHz, fullness, bpm }) {
+  const L = clamp01((loudnessDb + 22) / 16);
+  const D = clamp01((onsetsPerSec - 2) / 7);
+  const C = clamp01((centroidHz - 1200) / 2000);
+  const B = clamp01((bpm - 110) / 40);
   const F = clamp01(fullness / 0.7);
-  const score = 0.4 * L + 0.15 * D + 0.15 * C + 0.15 * B + 0.15 * F;
-  const level = Math.max(1, Math.min(10, Math.round(1 + score * 9)));
+  const score = 0.2 * L + 0.15 * D + 0.3 * C + 0.2 * B + 0.15 * F;
+  const level = Math.max(1, Math.min(10, Math.round(1 + 9 * score ** 1.3)));
   const r2 = (v) => Math.round(v * 100) / 100;
   return {
     level,
     score: r2(score),
-    loudnessDb: Math.round(loudDb * 10) / 10,
-    onsetsPerSec: Math.round(density * 10) / 10,
-    centroidHz: Math.round(centroid),
+    loudnessDb: Math.round(loudnessDb * 10) / 10,
+    onsetsPerSec: Math.round(onsetsPerSec * 10) / 10,
+    centroidHz: Math.round(centroidHz),
     fullness: r2(fullness),
     parts: { L: r2(L), D: r2(D), C: r2(C), B: r2(B), F: r2(F) },
+    weights: { L: 20, D: 15, C: 30, B: 20, F: 15 },
   };
 }
 
