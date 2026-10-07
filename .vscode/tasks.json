@@ -4,15 +4,38 @@
     {
       "label": "Iniciar KeyMix Pro",
       "type": "shell",
-      "command": "python3 -u -m http.server 8080",
-      "windows": { "command": "py -u -m http.server 8080" },
+      "command": "python3 -u scripts/serve.py 8080",
+      "windows": {
+        "command": "py -u scripts/serve.py 8080"
+      },
       "isBackground": true,
       "problemMatcher": {
         "owner": "keymix",
-        "pattern": { "regexp": "^__nunca__$" },
-        "background": { "activesBegin": true, "beginsPattern": "Serving HTTP", "endsPattern": "Serving HTTP" }
+        "pattern": {
+          "regexp": "^__nunca__$"
+        },
+        "background": {
+          "activesBegin": true,
+          "beginsPattern": "Serving HTTP|ERROR",
+          "endsPattern": "Serving HTTP|ERROR"
+        }
       },
-      "presentation": { "reveal": "always", "panel": "dedicated" }
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Detener KeyMix Pro",
+      "type": "shell",
+      "command": "pkill -f 'scripts/serve.py' || true",
+      "windows": {
+        "command": "Get-CimInstance Win32_Process -Filter \"CommandLine like '%scripts/serve.py%'\" | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "silent"
+      }
     },
     {
       "label": "Tests",

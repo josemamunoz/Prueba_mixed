@@ -22,7 +22,7 @@ Además incluye:
 Los módulos ES y los Web Workers necesitan servirse por HTTP (no funcionan con `file://`):
 
 ```bash
-npm start            # equivale a: python3 -m http.server 8080
+npm start            # equivale a: python3 scripts/serve.py 8080
 # abre http://localhost:8080
 ```
 
