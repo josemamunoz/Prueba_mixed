@@ -151,16 +151,15 @@ function buildCommentFrame(text, major) {
 }
 
 /**
- * Escribe/reemplaza marcos y devuelve un Blob con el MP3 resultante.
- * values: { key?, bpm?, comment? } — solo se tocan los campos presentes.
+ * Construye una etiqueta ID3 completa (cabecera + marcos + relleno) a partir de una etiqueta
+ * existente (o ninguna), reemplazando solo los campos presentes en values.
  */
-export function writeTags(arrayBuffer, values) {
-  const bytes = new Uint8Array(arrayBuffer);
-  const header = parseHeader(bytes);
+function buildTag(tagBytes, values, padding = 1024) {
+  const header = tagBytes ? parseHeader(tagBytes) : null;
   if (header && header.flags & 0x80) throw new Error('Etiqueta ID3 con «unsynchronisation»: no soportada.');
   if (header && header.major < 3) throw new Error('ID3v2.2 no soportado.');
   const major = header ? header.major : 3;
-  const keep = header ? parseFrames(bytes, header) : [];
+  const keep = header ? parseFrames(tagBytes, header) : [];
   const replace = new Set();
   if (values.key != null) replace.add('TKEY');
   if (values.bpm != null) replace.add('TBPM');
@@ -189,12 +188,116 @@ export function writeTags(arrayBuffer, values) {
   if (values.bpm != null) parts.push(buildTextFrame('TBPM', String(values.bpm), major));
   if (values.comment != null) parts.push(buildCommentFrame(String(values.comment), major));
 
-  const padding = 1024;
   const framesLen = parts.reduce((a, p) => a + p.length, 0);
-  const size = framesLen + padding;
-  const head = new Uint8Array(10);
-  head.set([0x49, 0x44, 0x33, major, 0, 0], 0);
-  head.set(encodeSize(size, 4), 6); // el tamaño de cabecera siempre es syncsafe
+  const out = new Uint8Array(10 + framesLen + padding);
+  out.set([0x49, 0x44, 0x33, major, 0, 0], 0);
+  out.set(encodeSize(framesLen + padding, 4), 6); // el tamaño de cabecera siempre es syncsafe
+  let off = 10;
+  for (const p of parts) {
+    out.set(p, off);
+    off += p.length;
+  }
+  return out;
+}
+
+/**
+ * MP3: escribe/reemplaza marcos y devuelve un Blob con el archivo resultante.
+ * values: { key?, bpm?, comment? } — solo se tocan los campos presentes.
+ */
+export function writeTags(arrayBuffer, values) {
+  const bytes = new Uint8Array(arrayBuffer);
+  const header = parseHeader(bytes);
+  const tag = buildTag(header ? bytes.subarray(0, header.total) : null, values);
   const audio = bytes.subarray(header ? header.total : 0);
-  return new Blob([head, ...parts, new Uint8Array(padding), audio], { type: 'audio/mpeg' });
+  return new Blob([tag, audio], { type: 'audio/mpeg' });
+}
+
+// ------------------------------------------------- AIFF y WAV (sin pérdida) ----
+// Ambos formatos guardan la etiqueta ID3 en un bloque propio («ID3 » en AIFF, «id3 » en WAV),
+// que es donde la leen Rekordbox, Serato, Traktor o Mixed In Key. El audio se copia byte a byte.
+
+const tag4 = (b, o) => String.fromCharCode(b[o], b[o + 1], b[o + 2], b[o + 3]);
+
+function containerInfo(bytes) {
+  if (bytes.length < 12) return null;
+  const id = tag4(bytes, 0);
+  const form = tag4(bytes, 8);
+  if (id === 'FORM' && (form === 'AIFF' || form === 'AIFC')) return { kind: 'aiff', le: false, mime: 'audio/aiff' };
+  if (id === 'RIFF' && form === 'WAVE') return { kind: 'wav', le: true, mime: 'audio/wav' };
+  if (id === 'RF64' || id === 'BW64') throw new Error('WAV de más de 4 GB (RF64): no soportado.');
+  return null;
+}
+
+function chunks(bytes, info) {
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const end = Math.min(bytes.length, 8 + dv.getUint32(4, info.le));
+  const list = [];
+  let off = 12;
+  while (off + 8 <= end) {
+    const size = dv.getUint32(off + 4, info.le);
+    const next = Math.min(end, off + 8 + size + (size & 1));
+    list.push({ id: tag4(bytes, off), start: off, body: off + 8, size, end: next });
+    off = next;
+  }
+  return list;
+}
+
+const isId3Chunk = (id) => id === 'ID3 ' || id === 'id3 ';
+
+/** ¿El archivo es un AIFF o WAV cuyas etiquetas se pueden escribir? */
+export function isTaggableContainer(arrayBuffer) {
+  try {
+    return !!containerInfo(new Uint8Array(arrayBuffer));
+  } catch {
+    return false;
+  }
+}
+
+/** Lee título, artista, etc. del bloque ID3 de un AIFF o WAV. */
+export function readContainerTags(arrayBuffer) {
+  const bytes = new Uint8Array(arrayBuffer);
+  let info;
+  try {
+    info = containerInfo(bytes);
+  } catch {
+    return {};
+  }
+  if (!info) return {};
+  const c = chunks(bytes, info).find((x) => isId3Chunk(x.id));
+  if (!c) return {};
+  return readTags(bytes.slice(c.body, Math.min(bytes.length, c.body + c.size)).buffer);
+}
+
+/**
+ * AIFF/WAV: reemplaza (o añade al final) el bloque ID3 y devuelve un Blob con el archivo.
+ * Los bloques de audio y el resto de metadatos se conservan sin cambios.
+ */
+export function writeContainerTags(arrayBuffer, values) {
+  const bytes = new Uint8Array(arrayBuffer);
+  const info = containerInfo(bytes);
+  if (!info) throw new Error('No es un archivo AIFF ni WAV.');
+  const list = chunks(bytes, info);
+  const old = list.find((x) => isId3Chunk(x.id));
+  let tag = buildTag(old ? bytes.subarray(old.body, old.body + old.size) : null, values);
+  if (tag.length & 1) tag = Uint8Array.from([...tag, 0]); // los bloques deben tener tamaño par
+
+  const chunkHead = new Uint8Array(8);
+  const id = info.kind === 'aiff' ? 'ID3 ' : 'id3 ';
+  for (let i = 0; i < 4; i++) chunkHead[i] = id.charCodeAt(i);
+  new DataView(chunkHead.buffer).setUint32(4, tag.length, info.le);
+
+  const parts = [];
+  for (const c of list) {
+    if (c === old) continue;
+    parts.push(bytes.subarray(c.start, c.end));
+  }
+  // Mismo sitio que el bloque antiguo si existía; si no, al final.
+  const idx = old ? list.indexOf(old) : parts.length;
+  parts.splice(idx, 0, chunkHead, tag);
+
+  const total = 12 + parts.reduce((a, p) => a + p.length, 0);
+  if (total - 8 > 0xffffffff) throw new Error('El archivo resultante superaría los 4 GB.');
+  const head = bytes.slice(0, 12);
+  new DataView(head.buffer).setUint32(4, total - 8, info.le);
+  return new Blob([head, ...parts], { type: info.mime });
 }

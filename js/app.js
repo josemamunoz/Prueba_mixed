@@ -1,6 +1,6 @@
 import { ANALYSIS_SAMPLE_RATE, energyFromFeatures } from './dsp.js';
 import { formatKey, keyColor, compatibility, fromCamelot } from './camelot.js';
-import { readTags, writeTags } from './id3.js';
+import { readTags, writeTags, writeContainerTags, readContainerTags } from './id3.js';
 import { isAiff, parseAiff, encodeWav } from './aiff.js';
 import { makeDemoFiles } from './demo.js';
 import { buildSet, describeTransition, transitionCost, bpmDistance, pathCost } from './setbuilder.js';
@@ -9,6 +9,8 @@ import { buildSet, describeTransition, transitionCost, bpmDistance, pathCost } f
 
 const STORAGE_KEY = 'keymix.library.v1';
 const SETTINGS_KEY = 'keymix.settings.v1';
+const TAGGABLE_EXT = /\.(mp3|wav|wave|aif|aiff|aifc)$/i;
+const isTaggable = (name) => TAGGABLE_EXT.test(name);
 const AUDIO_EXT = /\.(mp3|wav|wave|flac|m4a|mp4|aac|ogg|oga|opus|aif|aiff|webm)$/i;
 const CUE_COLORS = ['#f87171', '#fb923c', '#fbbf24', '#a3e635', '#34d399', '#22d3ee', '#60a5fa', '#c084fc'];
 const PITCHES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -265,8 +267,8 @@ async function processTrack(t) {
     t.stage = 'Decodificando';
     scheduleRender();
     const ab = await t.file.arrayBuffer();
-    if (/\.mp3$/i.test(t.name)) {
-      const tags = readTags(ab);
+    if (/\.(mp3|wav|wave)$/i.test(t.name)) {
+      const tags = /\.mp3$/i.test(t.name) ? readTags(ab) : readContainerTags(ab);
       if (tags.title) t.title = tags.title;
       if (tags.artist) t.artist = tags.artist;
     }
@@ -642,7 +644,8 @@ function renderDetails() {
           el('span', { class: 's-meta' }, `${fmtBpm(o.result.bpm)} · E${o.result.energy}`))))
     : el('p', { class: 'muted' }, 'No hay pistas compatibles en la biblioteca todavía.');
 
-  const isMp3 = /\.mp3$/i.test(t.name);
+  const taggable = isTaggable(t.name);
+  const canSaveInPlace = !!t.handle && !s.renamePrefix;
   const opt = (key, label) =>
     el('label', {}, el('input', {
       type: 'checkbox', checked: s[key],
@@ -658,10 +661,15 @@ function renderDetails() {
       el('select', { onchange: (e) => { s.tagNotation = e.target.value; saveSettings(); renderDetails(); } },
         ['camelot', 'openkey', 'musical'].map((n) => el('option', { value: n, selected: s.tagNotation === n }, { camelot: 'Camelot', openkey: 'Open Key', musical: 'Musical' }[n])))),
     el('button', {
-      class: 'btn primary', disabled: !isMp3 || !t.file,
-      title: !isMp3 ? 'La escritura de etiquetas solo está disponible para MP3' : !t.file ? 'Vuelve a añadir el archivo para poder etiquetarlo' : '',
+      class: 'btn primary', disabled: !taggable || !t.file,
+      title: !taggable ? 'Las etiquetas se pueden escribir en MP3, AIFF y WAV' : !t.file ? 'Vuelve a añadir el archivo para poder etiquetarlo' : '',
       onclick: () => tagTrack(t),
-    }, t.handle && !s.renamePrefix ? 'Guardar etiquetas en el archivo' : 'Descargar MP3 etiquetado'));
+    }, canSaveInPlace ? 'Guardar etiquetas en el archivo original' : 'Descargar copia etiquetada'),
+    el('p', { class: 'hint' }, !taggable
+      ? 'Este formato no admite etiquetas desde la app (solo MP3, AIFF y WAV).'
+      : canSaveInPlace
+        ? 'Se escribe un bloque ID3 dentro del archivo. El audio no se modifica.'
+        : 'Se descargará una copia con el mismo formato y el audio intacto. Para guardar en tus archivos originales, ábrelos con «Abrir carpeta» (Chrome o Edge).'));
 
   box.replaceChildren(
     ...head,
@@ -685,7 +693,7 @@ function renderDetails() {
     cueList,
     el('div', { class: 'section-title' }, 'Mezclan bien a continuación'),
     suggList,
-    el('div', { class: 'section-title' }, 'Escribir etiquetas (MP3)'),
+    el('div', { class: 'section-title' }, 'Escribir etiquetas (MP3, AIFF, WAV)'),
     tagBox,
     el('div', { class: 'section-title' }, 'Cómo se calculó la energía'),
     energyBreakdown(r),
@@ -782,7 +790,9 @@ async function tagTrack(t, { quiet = false, forceDownload = false } = {}) {
     return false;
   }
   try {
-    const blob = writeTags(await t.file.arrayBuffer(), values);
+    // MP3: etiqueta al principio. AIFF/WAV: bloque ID3 dentro del archivo; el audio se copia tal cual.
+    const ab = await t.file.arrayBuffer();
+    const blob = /\.mp3$/i.test(t.name) ? writeTags(ab, values) : writeContainerTags(ab, values);
     if (t.handle && !s.renamePrefix && !forceDownload) {
       if ((await t.handle.queryPermission?.({ mode: 'readwrite' })) !== 'granted') {
         const p = await t.handle.requestPermission?.({ mode: 'readwrite' });
@@ -808,18 +818,22 @@ async function tagTrack(t, { quiet = false, forceDownload = false } = {}) {
 }
 
 async function tagAll() {
-  const mp3 = done().filter((t) => /\.mp3$/i.test(t.name) && t.file);
-  if (!mp3.length) {
-    toast('No hay MP3 vinculados para etiquetar (vuelve a añadir los archivos)', 'error');
+  const list = done().filter((t) => isTaggable(t.name) && t.file);
+  if (!list.length) {
+    toast('No hay archivos MP3, AIFF o WAV vinculados para etiquetar (vuelve a añadirlos)', 'error');
     return;
   }
-  const inPlace = mp3.every((t) => t.handle) && !state.settings.renamePrefix;
-  if (!inPlace && mp3.length > 5 && !(await confirmDialog('Etiquetar todos los MP3', `Se descargarán ${mp3.length} archivos. Para sobrescribir los originales usa «Abrir carpeta» (Chrome/Edge).`, 'Descargar'))) return;
+  const inPlace = list.every((t) => t.handle) && !state.settings.renamePrefix;
+  const msg = inPlace
+    ? `Se escribirán las etiquetas dentro de ${list.length} archivo(s) originales. El audio no se modifica.`
+    : `Se descargarán ${list.length} copias etiquetadas. Para escribir en los originales usa «Abrir carpeta» (Chrome/Edge).`;
+  if (!(await confirmDialog('Etiquetar todos', msg, inPlace ? 'Escribir etiquetas' : 'Descargar'))) return;
   let ok = 0;
-  for (const t of mp3) {
+  for (const t of list) {
     if (await tagTrack(t, { quiet: true })) ok++;
+    toast(`Etiquetando… ${ok} de ${list.length}`, 'info', 1200);
   }
-  toast(`${ok} de ${mp3.length} MP3 etiquetados`);
+  toast(`${ok} de ${list.length} archivos etiquetados`);
 }
 
 // ------------------------------------------------------- Exportación ----

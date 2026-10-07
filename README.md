@@ -12,7 +12,7 @@ Además incluye:
 - **Rueda Camelot** interactiva: resalta las claves compatibles con la pista seleccionada y permite filtrar por tonalidad.
 - **Mezcla armónica**: filtro «Solo compatibles» (tonalidad + BPM ±6 %, incluida la mezcla a doble o mitad de tempo) y sugerencias de «qué pinchar después».
 - **Constructor de sets**: ordena las pistas para minimizar choques armónicos, saltos de tempo y caídas de energía; muestra la curva de energía y cada transición (misma tonalidad, ±1, relativa, energy boost, diagonal…). Exporta a M3U o CSV.
-- **Escritura de etiquetas ID3 en MP3**: comentario «8A - Energy 7», campos TKEY y TBPM, y opcionalmente un prefijo en el nombre del archivo. En Chrome y Edge, «Abrir carpeta» permite guardar las etiquetas directamente en los archivos originales; en otros navegadores se descarga una copia etiquetada.
+- **Escritura de etiquetas sin pérdida en MP3, AIFF y WAV**: comentario «8A - Energy 7», campos TKEY y TBPM. En AIFF y WAV se escribe un bloque ID3 dentro del archivo (donde lo leen Rekordbox, Serato, Traktor y Mixed In Key) y el audio se copia byte a byte, sin recodificar. En Chrome y Edge, «Abrir carpeta» guarda las etiquetas en los archivos originales; en otros navegadores se descarga una copia etiquetada en el mismo formato.
 - **Reproductor** con forma de onda coloreada por frecuencias, marcas de frase, cabezal y botones de cue 1–8.
 - **Biblioteca persistente**: los análisis se guardan en el navegador. Si vuelves a añadir un archivo ya analizado, se reutiliza el resultado al instante.
 - Exportación de la biblioteca a CSV o JSON.
