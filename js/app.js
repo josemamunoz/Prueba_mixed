@@ -681,8 +681,30 @@ function renderDetails() {
     suggList,
     el('div', { class: 'section-title' }, 'Escribir etiquetas (MP3)'),
     tagBox,
-    el('p', { class: 'hint' }, `Volumen activo ${r.energyDetail?.loudnessDb ?? '?'} dBFS · ${r.energyDetail?.onsetsPerSec ?? '?'} ataques/s`),
+    el('div', { class: 'section-title' }, 'Cómo se calculó la energía'),
+    energyBreakdown(r),
   );
+}
+
+function energyBreakdown(r) {
+  const e = r.energyDetail || {};
+  if (!e.parts) {
+    return el('p', { class: 'hint' }, `Volumen activo ${e.loudnessDb ?? '?'} dBFS · ${e.onsetsPerSec ?? '?'} ataques/s. Vuelve a analizar la pista (Vaciar biblioteca y añadirla de nuevo) para ver el desglose completo.`);
+  }
+  const rows = [
+    ['Volumen', `${e.loudnessDb} dBFS`, e.parts.L, 40],
+    ['Golpes', `${e.onsetsPerSec} /s`, e.parts.D, 15],
+    ['Brillo', `${e.centroidHz} Hz`, e.parts.C, 15],
+    ['Tempo', `${fmtBpm(r.bpm)} BPM`, e.parts.B, 15],
+    ['Plenitud', `${Math.round(e.fullness * 100)} %`, e.parts.F, 15],
+  ];
+  return el('div', { class: 'energy-breakdown' },
+    rows.map(([name, raw, part, w]) => el('div', { class: 'eb-row', title: `Aporta ${(part * w / 100).toFixed(3)} a la puntuación (peso ${w} %)` },
+      el('span', { class: 'eb-name' }, name),
+      el('span', { class: 'eb-raw' }, raw),
+      el('span', { class: 'eb-bar' }, el('i', { style: `width:${Math.round(part * 100)}%` })),
+      el('span', { class: 'eb-val' }, part.toFixed(2)))),
+    el('div', { class: 'eb-total' }, `Puntuación ${e.score.toFixed(2)} → energía ${r.energy}`));
 }
 
 // -------------------------------------------------------- Etiquetas ----

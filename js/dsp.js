@@ -495,7 +495,16 @@ function estimateEnergy(feat, bpm, duration) {
   const F = clamp01(fullness / 0.7);
   const score = 0.4 * L + 0.15 * D + 0.15 * C + 0.15 * B + 0.15 * F;
   const level = Math.max(1, Math.min(10, Math.round(1 + score * 9)));
-  return { level, score, loudnessDb: Math.round(loudDb * 10) / 10, onsetsPerSec: Math.round(density * 10) / 10 };
+  const r2 = (v) => Math.round(v * 100) / 100;
+  return {
+    level,
+    score: r2(score),
+    loudnessDb: Math.round(loudDb * 10) / 10,
+    onsetsPerSec: Math.round(density * 10) / 10,
+    centroidHz: Math.round(centroid),
+    fullness: r2(fullness),
+    parts: { L: r2(L), D: r2(D), C: r2(C), B: r2(B), F: r2(F) },
+  };
 }
 
 // --------------------------------------------------------- Cue points ----
