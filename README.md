@@ -13,6 +13,7 @@ Además incluye:
 - **Mezcla armónica**: filtro «Solo compatibles» (tonalidad + BPM ±6 %, incluida la mezcla a doble o mitad de tempo) y sugerencias de «qué pinchar después».
 - **Constructor de sets**: ordena las pistas para minimizar choques armónicos, saltos de tempo y caídas de energía; muestra la curva de energía y cada transición (misma tonalidad, ±1, relativa, energy boost, diagonal…). Exporta a M3U o CSV.
 - **Escritura de etiquetas sin pérdida en MP3, AIFF y WAV**: comentario «8A - Energy 7», campos TKEY y TBPM. En AIFF y WAV se escribe un bloque ID3 dentro del archivo (donde lo leen Rekordbox, Serato, Traktor y Mixed In Key) y el audio se copia byte a byte, sin recodificar. En Chrome y Edge, «Abrir carpeta» guarda las etiquetas en los archivos originales; en otros navegadores se descarga una copia etiquetada en el mismo formato.
+- **Copias etiquetadas en otra carpeta** (Exportar → «Copiar etiquetadas a otra carpeta…»): deja intactos los originales y escribe copias etiquetadas, en el mismo formato y sin pérdida, en la carpeta que elijas (Chrome/Edge). Usa las pistas marcadas o, si no hay ninguna, toda la biblioteca. Nunca sobrescribe: si el nombre ya existe, guarda «nombre (2)».
 - **Reproductor** con forma de onda coloreada por frecuencias, marcas de frase, cabezal y botones de cue 1–8.
 - **Biblioteca persistente**: los análisis se guardan en el navegador. Si vuelves a añadir un archivo ya analizado, se reutiliza el resultado al instante.
 - Exportación de la biblioteca a CSV o JSON.

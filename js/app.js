@@ -665,6 +665,9 @@ function renderDetails() {
       title: !taggable ? 'Las etiquetas se pueden escribir en MP3, AIFF y WAV' : !t.file ? 'Vuelve a añadir el archivo para poder etiquetarlo' : '',
       onclick: () => tagTrack(t),
     }, canSaveInPlace ? 'Guardar etiquetas en el archivo original' : 'Descargar copia etiquetada'),
+    'showDirectoryPicker' in window && taggable && t.file
+      ? el('button', { class: 'btn', onclick: () => copyTaggedToFolder(t) }, 'Guardar copia etiquetada en otra carpeta…')
+      : null,
     el('p', { class: 'hint' }, !taggable
       ? 'Este formato no admite etiquetas desde la app (solo MP3, AIFF y WAV).'
       : canSaveInPlace
@@ -778,21 +781,38 @@ function exportText(text, filename, type) {
   ]);
 }
 
-async function tagTrack(t, { quiet = false, forceDownload = false } = {}) {
+function tagValues(t) {
   const s = state.settings;
   const keyStr = tagKeyString(t);
   const values = {};
   if (s.tagKeyField && keyStr) values.key = keyStr;
   if (s.tagBpm && t.result.bpm) values.bpm = Math.round(t.result.bpm);
   if (s.tagComment) values.comment = `${keyStr} - Energy ${t.result.energy}`;
+  return values;
+}
+
+/** Nombre del archivo etiquetado (con prefijo «8A - 124 - » si está activada la opción). */
+function taggedName(t) {
+  if (!state.settings.renamePrefix) return t.name;
+  return `${tagKeyString(t)} - ${fmtBpm(Math.round(t.result.bpm))} - ${t.name}`.replace(/[\\/:*?"<>|]/g, '_');
+}
+
+/** Lee el archivo original (sin modificarlo) y devuelve un Blob con la copia etiquetada. */
+async function buildTaggedBlob(t, values) {
+  // MP3: etiqueta al principio. AIFF/WAV: bloque ID3 dentro del archivo; el audio se copia tal cual.
+  const ab = await t.file.arrayBuffer();
+  return /\.mp3$/i.test(t.name) ? writeTags(ab, values) : writeContainerTags(ab, values);
+}
+
+async function tagTrack(t, { quiet = false, forceDownload = false } = {}) {
+  const s = state.settings;
+  const values = tagValues(t);
   if (!Object.keys(values).length && !s.renamePrefix) {
     toast('Activa al menos una opción de etiquetado', 'error');
     return false;
   }
   try {
-    // MP3: etiqueta al principio. AIFF/WAV: bloque ID3 dentro del archivo; el audio se copia tal cual.
-    const ab = await t.file.arrayBuffer();
-    const blob = /\.mp3$/i.test(t.name) ? writeTags(ab, values) : writeContainerTags(ab, values);
+    const blob = await buildTaggedBlob(t, values);
     if (t.handle && !s.renamePrefix && !forceDownload) {
       if ((await t.handle.queryPermission?.({ mode: 'readwrite' })) !== 'granted') {
         const p = await t.handle.requestPermission?.({ mode: 'readwrite' });
@@ -806,7 +826,7 @@ async function tagTrack(t, { quiet = false, forceDownload = false } = {}) {
       save();
       if (!quiet) toast(`Etiquetas guardadas en «${t.name}»`);
     } else {
-      const name = s.renamePrefix ? `${keyStr} - ${fmtBpm(Math.round(t.result.bpm))} - ${t.name}` : t.name;
+      const name = taggedName(t);
       downloadBlob(blob, name);
       if (!quiet) toast(`Descargado «${name}»`);
     }
@@ -834,6 +854,82 @@ async function tagAll() {
     toast(`Etiquetando… ${ok} de ${list.length}`, 'info', 1200);
   }
   toast(`${ok} de ${list.length} archivos etiquetados`);
+}
+
+/** Primer nombre libre en la carpeta: «x.aiff», «x (2).aiff», «x (3).aiff»… Nunca sobrescribe. */
+async function freeName(dir, name) {
+  const dot = name.lastIndexOf('.');
+  const base = dot > 0 ? name.slice(0, dot) : name;
+  const ext = dot > 0 ? name.slice(dot) : '';
+  for (let i = 1; i < 1000; i++) {
+    const candidate = i === 1 ? name : `${base} (${i})${ext}`;
+    try {
+      await dir.getFileHandle(candidate); // existe: probar el siguiente
+    } catch (err) {
+      if (err.name === 'NotFoundError') return candidate;
+      throw err;
+    }
+  }
+  throw new Error('Demasiados archivos con el mismo nombre');
+}
+
+/**
+ * Escribe copias etiquetadas en otra carpeta. Los originales solo se leen.
+ * Usa las pistas marcadas; si no hay ninguna marcada, la pista indicada o todas.
+ */
+async function copyTaggedToFolder(only = null) {
+  const marked = done().filter((t) => state.checked.has(t.id));
+  const pool = only ? [only] : marked.length ? marked : done();
+  const list = pool.filter((t) => isTaggable(t.name) && t.file);
+  const skipped = pool.length - list.length;
+  if (!list.length) {
+    toast('No hay pistas MP3, AIFF o WAV con archivo vinculado (vuelve a añadirlas)', 'error');
+    return;
+  }
+  if (!Object.keys(tagValues(list[0])).length && !state.settings.renamePrefix) {
+    toast('Activa al menos una opción de etiquetado en el panel de la pista', 'error');
+    return;
+  }
+  if (!('showDirectoryPicker' in window)) {
+    const ok = await confirmDialog('Copiar etiquetadas',
+      `Este navegador no permite elegir una carpeta de destino. Se descargarán ${list.length} copia(s) etiquetada(s) en tu carpeta de descargas. Para elegir carpeta usa Chrome o Edge.`, 'Descargar');
+    if (!ok) return;
+    for (const t of list) downloadBlob(await buildTaggedBlob(t, tagValues(t)), taggedName(t));
+    return;
+  }
+  const scope = only ? `«${only.title}»` : marked.length ? `las ${list.length} pistas marcadas` : `las ${list.length} pistas de la biblioteca`;
+  const go = await confirmDialog('Copiar etiquetadas a otra carpeta',
+    `Se guardará una copia etiquetada de ${scope} en la carpeta que elijas, con el mismo formato y el audio intacto. Tus archivos originales no se modifican y no se sobrescribe nada en el destino.${skipped ? ` Se omitirán ${skipped} pista(s) sin archivo vinculado o en un formato sin etiquetas.` : ''}`,
+    'Elegir carpeta');
+  if (!go) return;
+  let dir;
+  try {
+    dir = await window.showDirectoryPicker({ id: 'keymix-destino', mode: 'readwrite', startIn: 'music' });
+  } catch (err) {
+    if (err.name !== 'AbortError') toast(`No se pudo abrir la carpeta: ${err.message}`, 'error');
+    return;
+  }
+  let ok = 0;
+  const renamed = [];
+  const failed = [];
+  for (const t of list) {
+    try {
+      const blob = await buildTaggedBlob(t, tagValues(t));
+      const wanted = taggedName(t);
+      const name = await freeName(dir, wanted);
+      if (name !== wanted) renamed.push(name);
+      const fh = await dir.getFileHandle(name, { create: true });
+      const w = await fh.createWritable();
+      await w.write(blob);
+      await w.close();
+      ok++;
+      if (list.length > 1) toast(`Copiando… ${ok} de ${list.length}`, 'info', 1200);
+    } catch (err) {
+      failed.push(`${t.name}: ${err.message}`);
+    }
+  }
+  toast(`${ok} copia(s) etiquetada(s) guardada(s) en «${dir.name}»${renamed.length ? ` · ${renamed.length} renombrada(s) para no sobrescribir` : ''}`, 'info', 6000);
+  if (failed.length) toast(`No se pudieron copiar ${failed.length}: ${failed.slice(0, 3).join(' · ')}`, 'error', 9000);
 }
 
 // ------------------------------------------------------- Exportación ----
@@ -1195,6 +1291,7 @@ function bindEvents() {
     if (action === 'csv') exportCsv(done(), 'keymix-biblioteca.csv');
     if (action === 'json') exportJson();
     if (action === 'tag-all') tagAll();
+    if (action === 'copy-tagged') copyTaggedToFolder();
     if (action === 'clear') confirmDialog('Vaciar biblioteca', 'Se borrarán los análisis guardados. Tus archivos no se tocan.', 'Vaciar', true).then((ok) => {
       if (!ok) return;
       queue.length = 0;
