@@ -1,0 +1,21 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "KeyMix Pro (Chrome)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:8080",
+      "webRoot": "${workspaceFolder}",
+      "preLaunchTask": "Iniciar KeyMix Pro"
+    },
+    {
+      "name": "KeyMix Pro (Edge)",
+      "type": "msedge",
+      "request": "launch",
+      "url": "http://localhost:8080",
+      "webRoot": "${workspaceFolder}",
+      "preLaunchTask": "Iniciar KeyMix Pro"
+    }
+  ]
+}
