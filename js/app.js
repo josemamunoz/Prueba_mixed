@@ -1054,8 +1054,48 @@ function drawWaveform() {
 function select(id, scroll = false) {
   state.selectedId = id;
   if (state.view !== 'library' && scroll) switchView('library');
-  render();
+  // Sin reconstruir la tabla: así las filas bajo el cursor siguen siendo las mismas entre clics.
+  if (state.compatOnly) renderTable();
+  else updateRowStates();
+  renderWheel();
+  renderDetails();
+  renderPlayerInfo();
+  if (state.view === 'set') renderSet();
+  drawWaveform();
   if (scroll) document.querySelector(`tr[data-id="${id}"]`)?.scrollIntoView({ block: 'nearest' });
+}
+
+/** Actualiza selección, pista en reproducción y puntos de compatibilidad sin redibujar filas. */
+function updateRowStates() {
+  const sel = byId(state.selectedId);
+  document.querySelectorAll('#track-body tr[data-id]').forEach((tr) => {
+    const t = byId(tr.dataset.id);
+    tr.classList.toggle('selected', tr.dataset.id === state.selectedId);
+    tr.classList.toggle('playing', tr.dataset.id === state.playingId);
+    const title = tr.querySelector('.t-title');
+    title?.querySelector('.compat-dot')?.remove();
+    const rel = sel?.result && t?.result ? relation(sel, t) : null;
+    if (title && rel) title.prepend(el('span', { class: `compat-dot compat-${rel.type}`, title: rel.label }));
+  });
+}
+
+/** Carga la pista en el reproductor y la reproduce desde el principio. */
+function playFromStart(t) {
+  if (!t) return;
+  if (t.status !== 'done') {
+    toast('Espera a que termine el análisis de esta pista para reproducirla');
+    return;
+  }
+  if (!loadIntoPlayer(t)) return;
+  const go = () => {
+    audio.currentTime = 0;
+    audio.play().catch((err) => toast(`No se pudo reproducir: ${err.message}`, 'error'));
+  };
+  if (audio.readyState >= 1) go();
+  else audio.addEventListener('loadedmetadata', go, { once: true });
+  updateRowStates();
+  renderPlayerInfo();
+  drawWaveform();
 }
 
 function switchView(view) {
@@ -1076,6 +1116,8 @@ function moveSelection(d) {
   const n = list[Math.max(0, Math.min(list.length - 1, i < 0 ? 0 : i + d))];
   select(n.id, true);
 }
+
+let lastRowClick = { id: null, time: 0 };
 
 function bindEvents() {
   $('#file-input').addEventListener('change', (e) => {
@@ -1162,17 +1204,18 @@ function bindEvents() {
       return;
     }
     const tr = e.target.closest('tr[data-id]');
-    if (tr) select(tr.dataset.id);
-  });
-  $('#track-body').addEventListener('dblclick', (e) => {
-    const tr = e.target.closest('tr[data-id]');
     if (!tr) return;
-    const t = byId(tr.dataset.id);
-    if (loadIntoPlayer(t)) {
-      audio.currentTime = 0;
-      audio.play().catch(() => {});
-    }
-    scheduleRender();
+    const id = tr.dataset.id;
+    // Doble clic detectado por tiempo y pista: funciona aunque la fila se haya redibujado entre clics.
+    const now = performance.now();
+    const isDouble = lastRowClick.id === id && now - lastRowClick.time < 450;
+    lastRowClick = isDouble ? { id: null, time: 0 } : { id, time: now };
+    if (state.selectedId !== id) select(id);
+    if (isDouble) playFromStart(byId(id));
+  });
+  // Evita que el doble clic seleccione el texto de la fila.
+  $('#track-body').addEventListener('mousedown', (e) => {
+    if (e.detail > 1 && e.target.closest('tr[data-id]')) e.preventDefault();
   });
 
   $('#wheel').addEventListener('click', (e) => {
@@ -1198,7 +1241,7 @@ function bindEvents() {
     state.settings.volume = audio.volume;
     saveSettings();
   });
-  audio.addEventListener('play', renderPlayerInfo);
+  audio.addEventListener('play', () => { renderPlayerInfo(); updateRowStates(); });
   audio.addEventListener('pause', renderPlayerInfo);
   audio.addEventListener('ended', renderPlayerInfo);
   let raf = 0;
@@ -1272,10 +1315,7 @@ function bindEvents() {
     if (e.key === ' ') { e.preventDefault(); togglePlay(); }
     else if (e.key === 'ArrowDown') { e.preventDefault(); moveSelection(1); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); moveSelection(-1); }
-    else if (e.key === 'Enter') {
-      const t = byId(state.selectedId);
-      if (t && loadIntoPlayer(t)) { audio.currentTime = 0; audio.play().catch(() => {}); scheduleRender(); }
-    } else if (/^[1-8]$/.test(e.key)) {
+    else if (e.key === 'Enter') playFromStart(byId(state.selectedId)); else if (/^[1-8]$/.test(e.key)) {
       const t = playerTrack();
       if (t) jumpToCue(t, Number(e.key) - 1);
     } else if (e.key === 'Home') audio.currentTime = 0;

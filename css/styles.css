@@ -191,7 +191,9 @@ table.tracks { width: 100%; border-collapse: collapse; }
 .tracks td { padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 .tracks tbody tr { cursor: pointer; }
 .tracks tbody tr:hover { background: var(--bg-3); }
-.tracks tbody tr.selected { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.tracks tbody tr.selected { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.tracks tbody tr.selected td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+.tracks tbody tr { user-select: none; }
 .tracks tbody tr.playing .t-title::before { content: "▶ "; color: var(--accent); }
 .c-check { width: 34px; }
 .c-num { width: 42px; color: var(--muted); }
