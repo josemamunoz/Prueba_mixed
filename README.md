@@ -26,7 +26,7 @@ npm start            # equivale a: python3 -m http.server 8080
 # abre http://localhost:8080
 ```
 
-Arrastra archivos o carpetas a la ventana, o usa «Añadir pistas». El navegador decodifica MP3, WAV, FLAC, AAC/M4A, OGG y AIFF (según su soporte).
+Arrastra archivos o carpetas a la ventana, o usa «Añadir pistas». Acepta MP3, WAV, FLAC, AAC/M4A y OGG (según lo que soporte el navegador) y AIFF/AIFF-C en cualquier navegador: la app los decodifica por su cuenta (PCM de 8 a 32 bits y coma flotante) y lee el título y el artista de su etiqueta ID3.
 
 ### Atajos de teclado
 
@@ -70,6 +70,7 @@ js/worker.js        Web Worker de análisis
 js/camelot.js       notaciones y reglas de mezcla armónica
 js/setbuilder.js    ordenación de sets
 js/id3.js           lectura y escritura de ID3v2.3/2.4
+js/aiff.js          decodificador AIFF/AIFF-C y codificador WAV
 scripts/            CLI de análisis para WAV
 tests/              tests con audio sintético
 ```

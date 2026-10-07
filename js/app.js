@@ -1,6 +1,7 @@
 import { ANALYSIS_SAMPLE_RATE } from './dsp.js';
 import { formatKey, keyColor, compatibility, fromCamelot } from './camelot.js';
 import { readTags, writeTags } from './id3.js';
+import { isAiff, parseAiff, encodeWav } from './aiff.js';
 import { makeDemoFiles } from './demo.js';
 import { buildSet, describeTransition, transitionCost, bpmDistance, pathCost } from './setbuilder.js';
 
@@ -187,6 +188,48 @@ function analyzeInWorker(samples, onProgress) {
   });
 }
 
+const isAiffName = (name) => /\.aiff?$|\.aifc$/i.test(name);
+
+/** Remuestrea con el motor de audio del navegador (filtro antialiasing incluido). */
+async function resampleMono(mono, fromRate) {
+  if (fromRate === ANALYSIS_SAMPLE_RATE) return mono;
+  const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  const ctx = new Ctx(1, Math.ceil((mono.length * ANALYSIS_SAMPLE_RATE) / fromRate), ANALYSIS_SAMPLE_RATE);
+  const buf = ctx.createBuffer(1, mono.length, fromRate);
+  buf.copyToChannel(mono, 0);
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  src.connect(ctx.destination);
+  src.start();
+  const out = await ctx.startRendering();
+  return out.getChannelData(0).slice();
+}
+
+/** AIFF: decodificación propia (los navegadores no lo soportan) + WAV en memoria para reproducir. */
+async function decodeAiff(arrayBuffer, t) {
+  const a = parseAiff(arrayBuffer);
+  if (a.id3) {
+    const tags = readTags(a.id3.slice().buffer);
+    if (tags.title) t.title = tags.title;
+    if (tags.artist) t.artist = tags.artist;
+  }
+  t.playFile = encodeWav(a.channels, a.sampleRate);
+  const n = a.channels[0].length;
+  const mono = new Float32Array(n);
+  for (const ch of a.channels) for (let i = 0; i < n; i++) mono[i] += ch[i] / a.channels.length;
+  return resampleMono(mono, a.sampleRate);
+}
+
+async function preparePlayback(t) {
+  if (t.playFile || !t.file || !isAiffName(t.name)) return;
+  try {
+    const a = parseAiff(await t.file.arrayBuffer());
+    t.playFile = encodeWav(a.channels, a.sampleRate);
+  } catch (err) {
+    console.warn('No se pudo preparar el AIFF para reproducir', err);
+  }
+}
+
 async function decodeToMono(arrayBuffer) {
   const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
   const ctx = new Ctx(1, 1, ANALYSIS_SAMPLE_RATE);
@@ -221,7 +264,7 @@ async function processTrack(t) {
       if (tags.title) t.title = tags.title;
       if (tags.artist) t.artist = tags.artist;
     }
-    const mono = await decodeToMono(ab);
+    const mono = isAiff(ab) ? await decodeAiff(ab, t) : await decodeToMono(ab);
     t.status = 'analyzing';
     t.stage = 'Analizando';
     scheduleRender();
@@ -272,7 +315,9 @@ function addFiles(files, handles = []) {
     if (existing) {
       // Ya analizada: solo se vuelve a vincular el archivo (para reproducir/etiquetar).
       existing.file = file;
+      existing.playFile = null;
       existing.handle = handles[i] || existing.handle;
+      preparePlayback(existing);
       if (existing.status === 'error') {
         existing.status = 'queued';
         queue.push(existing);
@@ -869,9 +914,14 @@ function loadIntoPlayer(t, autoplay = false) {
     if (t) toast('Esta pista está en caché pero sin archivo: vuelve a añadirla para reproducirla', 'error');
     return false;
   }
+  if (isAiffName(t.name) && !t.playFile) {
+    toast('Preparando el AIFF para reproducirlo, vuelve a intentarlo en un momento');
+    preparePlayback(t);
+    return false;
+  }
   if (state.playingId !== t.id) {
     if (currentUrl) URL.revokeObjectURL(currentUrl);
-    currentUrl = URL.createObjectURL(t.file);
+    currentUrl = URL.createObjectURL(t.playFile || t.file);
     audio.src = currentUrl;
     state.playingId = t.id;
   }
