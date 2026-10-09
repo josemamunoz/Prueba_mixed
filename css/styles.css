@@ -304,6 +304,28 @@ table.tracks { width: 100%; border-collapse: collapse; }
 .eb-bar i { display: block; height: 100%; background: var(--accent-2); }
 .eb-total { margin-top: 4px; font-weight: 600; }
 
+.drone-box { display: grid; gap: 8px; margin-bottom: 14px; }
+.drone-keys { display: flex; flex-wrap: wrap; gap: 6px; }
+.drone-btn {
+  display: grid; gap: 1px; justify-items: start;
+  padding: 6px 10px; min-width: 76px;
+  border-radius: 8px; border: 1px solid var(--line);
+  border-left: 6px solid var(--k);
+  background: var(--bg-3); cursor: pointer; text-align: left;
+}
+.drone-btn b { font-size: 14px; }
+.drone-btn small { color: var(--muted); font-size: 11px; }
+.drone-btn.on { background: var(--k); color: #111; border-color: var(--k); }
+.drone-btn.on small { color: #111; }
+.drone-btn.on b::before { content: "♪ "; }
+.drone-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; font-size: 12px; color: var(--muted); }
+.drone-controls label { display: inline-flex; gap: 6px; align-items: center; }
+.drone-controls input[type="range"] { width: 100px; accent-color: var(--accent); }
+.drone-help { font-size: 12px; color: var(--muted); }
+.drone-help summary { cursor: pointer; color: var(--accent-2); }
+.drone-help ol { margin: 6px 0; padding-left: 18px; display: grid; gap: 4px; }
+.drone-help p { margin: 4px 0 0; }
+
 /* ---------- Constructor de sets ---------- */
 .set-summary { padding: 10px 16px 0; color: var(--muted); font-size: 13px; }
 .energy-curve { width: calc(100% - 32px); height: 70px; margin: 8px 16px 0; flex-shrink: 0; }

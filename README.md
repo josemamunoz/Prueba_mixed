@@ -38,8 +38,18 @@ Arrastra archivos o carpetas a la ventana, o usa «Añadir pistas». Acepta MP3,
 | ↑ / ↓ | Cambiar de pista |
 | Intro | Reproducir desde el inicio |
 | `/` | Buscar |
+| T | Tono de referencia de la tonalidad detectada (encender/apagar) |
 | C | Activar o desactivar «Solo compatibles» |
 | A | Añadir archivos |
+
+### Comprobar la tonalidad a oído
+
+Ningún detector acierta siempre, y cada programa (Beatport, Rekordbox, Mixed In Key) puede dar una tonalidad distinta. En el panel de cada pista, **«Comprobar a oído»** toca un acorde suave encima de la canción:
+
+1. Reproduce la canción en una parte con armonía: salta a un cue de Drop o Break (teclas 1–8).
+2. Pulsa la tonalidad **detectada** (o la tecla T).
+3. Si es la correcta, el acorde se funde con la música y suena estable. Si no, notarás roces o un batido que ondula.
+4. Compara con las **alternativas** y la **relativa**. «Solo la tónica» ayuda a encontrar la nota central; «Acorde» ayuda a distinguir mayor de menor (8A frente a 8B).
 
 ## Cómo funciona
 

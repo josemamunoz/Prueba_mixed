@@ -1,5 +1,5 @@
 import { ANALYSIS_SAMPLE_RATE, energyFromFeatures } from './dsp.js';
-import { formatKey, keyColor, compatibility, fromCamelot } from './camelot.js';
+import { formatKey, keyColor, compatibility, fromCamelot, relativeCode, referenceMidi } from './camelot.js';
 import { readTags, writeTags, writeContainerTags, readContainerTags } from './id3.js';
 import { isAiff, parseAiff, encodeWav } from './aiff.js';
 import { makeDemoFiles } from './demo.js';
@@ -34,6 +34,8 @@ const state = {
     tagNotation: 'camelot',
     renamePrefix: false,
     volume: 0.9,
+    droneMode: 'chord',
+    droneVolume: 0.25,
   },
 };
 
@@ -683,6 +685,8 @@ function renderDetails() {
         el('div', {}, 'Tonalidad ', el('b', {}, `${k.musical} ${k.mode === 'major' ? '(mayor)' : '(menor)'}`)),
         el('div', {}, `Confianza ${Math.round(k.confidence * 100)}%`, k.alternatives?.length ? ` · alt. ${k.alternatives.join(', ')}` : ''),
         k.tuningCents ? el('div', {}, `Afinación ${k.tuningCents > 0 ? '+' : ''}${k.tuningCents} cents`) : null) : null),
+    k ? el('div', { class: 'section-title' }, 'Comprobar a oído') : null,
+    k ? droneBox(t) : null,
     el('div', { class: 'stats' },
       el('div', { class: 'stat' }, el('div', { class: 'v' }, fmtBpm(r.bpm)), el('div', { class: 'l' }, 'BPM')),
       el('div', { class: 'stat' }, el('div', { class: 'v' }, r.energy), el('div', { class: 'l' }, 'Energía')),
@@ -723,6 +727,118 @@ function energyBreakdown(r) {
       el('span', { class: 'eb-bar' }, el('i', { style: `width:${Math.round(part * 100)}%` })),
       el('span', { class: 'eb-val' }, part.toFixed(2)))),
     el('div', { class: 'eb-total' }, `Puntuación ${e.score.toFixed(2)} → energía ${r.energy}`));
+}
+
+// ------------------------------------------------- Tono de referencia ----
+// Un acorde o nota suave que suena encima de la canción para comprobar la tonalidad a oído.
+
+const drone = { ctx: null, master: null, voices: [], code: null };
+
+function startDrone(code) {
+  stopDrone();
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return toast('Este navegador no permite generar sonido', 'error');
+  if (!drone.ctx) drone.ctx = new Ctx();
+  const ctx = drone.ctx;
+  ctx.resume?.();
+  const master = ctx.createGain();
+  master.gain.value = 0;
+  const lp = ctx.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = 1400;
+  master.connect(lp);
+  lp.connect(ctx.destination);
+  const voices = referenceMidi(code, state.settings.droneMode).map((m, i) => {
+    const o = ctx.createOscillator();
+    o.type = i === 0 ? 'sine' : 'triangle';
+    o.frequency.value = 440 * 2 ** ((m - 69) / 12);
+    const g = ctx.createGain();
+    g.gain.value = i === 0 ? 0.55 : 0.3;
+    o.connect(g);
+    g.connect(master);
+    o.start();
+    return o;
+  });
+  master.gain.setTargetAtTime(state.settings.droneVolume, ctx.currentTime, 0.08); // entrada suave, sin clics
+  Object.assign(drone, { master, voices, code });
+}
+
+function stopDrone() {
+  const { ctx, master, voices } = drone;
+  if (ctx && master) {
+    master.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+    for (const o of voices) o.stop(ctx.currentTime + 0.3);
+  }
+  Object.assign(drone, { master: null, voices: [], code: null });
+}
+
+function toggleDrone(code) {
+  if (drone.code === code) stopDrone();
+  else startDrone(code);
+  renderDroneButtons();
+}
+
+function renderDroneButtons() {
+  document.querySelectorAll('[data-drone]').forEach((b) => {
+    const on = b.dataset.drone === drone.code;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', on);
+  });
+}
+
+/** Tonalidades a comparar: la detectada, sus alternativas y su relativa. */
+function droneCandidates(k) {
+  return [...new Set([k.camelot, ...(k.alternatives || []), relativeCode(k.camelot)])].filter(Boolean);
+}
+
+function droneBox(t) {
+  const k = t.result.key;
+  const s = state.settings;
+  const name = (code) => {
+    const c = fromCamelot(code);
+    return formatKey(c.tonic, c.mode, s.notation);
+  };
+  const label = (code, i) => (i === 0 ? 'detectada' : code === relativeCode(k.camelot) ? 'relativa' : 'alternativa');
+  return el('div', { class: 'drone-box' },
+    el('div', { class: 'drone-keys' }, droneCandidates(k).map((code, i) => {
+      const c = fromCamelot(code);
+      return el('button', {
+        class: `drone-btn ${drone.code === code ? 'on' : ''}`,
+        'data-drone': code,
+        'aria-pressed': drone.code === code,
+        style: `--k:${keyBg(code)}`,
+        title: `${formatKey(c.tonic, c.mode, 'musical')} ${c.mode === 'major' ? 'mayor' : 'menor'} · pulsa para escucharla encima de la canción`,
+        onclick: () => toggleDrone(code),
+      }, el('b', {}, name(code)), el('small', {}, label(code, i)));
+    })),
+    el('div', { class: 'drone-controls' },
+      el('label', {}, 'Sonido ',
+        el('select', {
+          id: 'drone-mode',
+          onchange: (e) => {
+            s.droneMode = e.target.value;
+            saveSettings();
+            if (drone.code) startDrone(drone.code);
+          },
+        }, el('option', { value: 'chord', selected: s.droneMode === 'chord' }, 'Acorde'),
+        el('option', { value: 'note', selected: s.droneMode === 'note' }, 'Solo la tónica'))),
+      el('label', {}, 'Volumen ',
+        el('input', {
+          id: 'drone-volume', type: 'range', min: 0.02, max: 0.6, step: 0.01, value: s.droneVolume,
+          oninput: (e) => {
+            s.droneVolume = Number(e.target.value);
+            saveSettings();
+            if (drone.master) drone.master.gain.setTargetAtTime(s.droneVolume, drone.ctx.currentTime, 0.05);
+          },
+        }))),
+    el('details', { class: 'drone-help' },
+      el('summary', {}, 'Cómo usarlo'),
+      el('ol', {},
+        el('li', {}, 'Reproduce la canción en una parte con armonía: salta a un cue de Drop o Break (teclas 1–8). Evita las intros de solo percusión.'),
+        el('li', {}, 'Pulsa la tonalidad «detectada». Suena un acorde suave encima de la música (tecla T).'),
+        el('li', {}, 'Si es la correcta, el acorde se funde con la canción y suena estable, «en casa». Si no lo es, notarás roces, tensión o un batido que ondula.'),
+        el('li', {}, 'Pulsa las otras opciones para comparar y quédate con la que mejor encaje. Vuelve a pulsar para apagar.')),
+      el('p', {}, 'Consejo: «Solo la tónica» ayuda a encontrar la nota central; «Acorde» ayuda a distinguir mayor de menor, por ejemplo 8A frente a 8B, que comparten las mismas notas.')));
 }
 
 // -------------------------------------------------------- Etiquetas ----
@@ -1191,6 +1307,7 @@ function drawWaveform() {
 // ------------------------------------------------------------ Acciones ----
 
 function select(id, scroll = false) {
+  if (id !== state.selectedId) stopDrone();
   state.selectedId = id;
   if (state.view !== 'library' && scroll) switchView('library');
   // Sin reconstruir la tabla: así las filas bajo el cursor siguen siendo las mismas entre clics.
@@ -1461,7 +1578,10 @@ function bindEvents() {
     } else if (e.key === 'Home') audio.currentTime = 0;
     else if (e.key === '/') { e.preventDefault(); $('#search').focus(); }
     else if (e.key.toLowerCase() === 'a') $('#file-input').click();
-    else if (e.key.toLowerCase() === 'c') { const c = $('#compat-only'); c.checked = !c.checked; c.dispatchEvent(new Event('change')); }
+    else if (e.key.toLowerCase() === 't') {
+      const t = byId(state.selectedId);
+      if (t?.result?.key) toggleDrone(drone.code || t.result.key.camelot);
+    } else if (e.key.toLowerCase() === 'c') { const c = $('#compat-only'); c.checked = !c.checked; c.dispatchEvent(new Event('change')); }
   });
 }
 

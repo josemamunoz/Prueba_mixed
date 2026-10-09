@@ -86,3 +86,22 @@ export function compatibleCodes(code) {
   }
   return out;
 }
+
+/** Relativa mayor/menor (mismo número, otra letra): 8A ↔ 8B. */
+export function relativeCode(code) {
+  const m = /^(\d{1,2})([AB])$/.exec(code || '');
+  return m ? `${m[1]}${m[2] === 'A' ? 'B' : 'A'}` : null;
+}
+
+/**
+ * Notas MIDI del tono de referencia de una tonalidad Camelot.
+ * mode 'note': tónica en dos octavas. mode 'chord': tónica grave + tríada (mayor o menor).
+ * La tónica se sitúa entre Do3 y Si3 (MIDI 48-59), un registro que se oye bien sobre la mezcla.
+ */
+export function referenceMidi(code, mode = 'chord') {
+  const k = fromCamelot(code);
+  if (!k) return [];
+  const root = 48 + k.tonic;
+  if (mode === 'note') return [root - 12, root];
+  return [root - 12, root, root + (k.mode === 'major' ? 4 : 3), root + 7];
+}

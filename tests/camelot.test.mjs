@@ -32,3 +32,12 @@ test('reglas de mezcla armónica', () => {
   assert.equal(compatibility('8A', '2B').type, 'clash');
   assert.equal(compatibleCodes('8A').length, 7);
 });
+
+test('tono de referencia: notas de la tríada y relativa', async () => {
+  const { referenceMidi, relativeCode } = await import('../js/camelot.js');
+  assert.deepEqual(referenceMidi('8A'), [45, 57, 60, 64]); // La menor: La2, La3, Do4, Mi4
+  assert.deepEqual(referenceMidi('8B'), [36, 48, 52, 55]); // Do mayor: Do2, Do3, Mi3, Sol3
+  assert.deepEqual(referenceMidi('11A', 'note'), [42, 54]); // Fa# menor: solo tónica
+  assert.equal(relativeCode('8A'), '8B');
+  assert.equal(relativeCode('12B'), '12A');
+});
