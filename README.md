@@ -18,7 +18,18 @@ Además incluye:
 - **Biblioteca persistente**: los análisis se guardan en el navegador. Si vuelves a añadir un archivo ya analizado, se reutiliza el resultado al instante.
 - Exportación de la biblioteca a CSV o JSON.
 
-## Uso
+## Uso sin servidor (doble clic)
+
+En la carpeta `dist/` está la app empaquetada en un solo archivo:
+
+- **`KeyMix Pro.bat`** (Windows): doble clic y se abre en una ventana propia de Edge o Chrome, sin barra de direcciones, como un programa.
+- **`KeyMix Pro.html`**: doble clic para abrirla en el navegador. Funciona en cualquier sistema.
+
+No necesita Python, Node ni conexión. Ambos archivos deben estar en la misma carpeta; puedes moverla donde quieras y crear un acceso directo al `.bat` en el escritorio. Para «Abrir carpeta» y guardar etiquetas en los originales usa Edge o Chrome.
+
+Tras modificar el código, regenera `dist/` con `npm run build`.
+
+## Uso con servidor local
 
 Los módulos ES y los Web Workers necesitan servirse por HTTP (no funcionan con `file://`):
 
@@ -89,6 +100,7 @@ js/setbuilder.js    ordenación de sets
 js/id3.js           lectura y escritura de ID3v2.3/2.4
 js/aiff.js          decodificador AIFF/AIFF-C y codificador WAV
 js/rekordbox.js     exportación a rekordbox XML (cue points, rejilla, tonalidad)
-scripts/            CLI de análisis para WAV
+scripts/            CLI de análisis, servidor local y empaquetador (build-standalone.mjs)
+dist/               versión de un solo archivo (KeyMix Pro.html + lanzador .bat)
 tests/              tests con audio sintético
 ```

@@ -1,0 +1,3776 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KeyMix Pro</title>
+  <meta name="description" content="Análisis de tonalidad (Camelot), BPM, energía y cue points para DJs, directamente en el navegador." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%2316181f'/%3E%3Cpath d='M16 3a13 13 0 0 1 13 13h-6a7 7 0 0 0-7-7z' fill='%2334d399'/%3E%3Cpath d='M29 16a13 13 0 0 1-13 13v-6a7 7 0 0 0 7-7z' fill='%2360a5fa'/%3E%3Cpath d='M16 29A13 13 0 0 1 3 16h6a7 7 0 0 0 7 7z' fill='%23f472b6'/%3E%3Cpath d='M3 16A13 13 0 0 1 16 3v6a7 7 0 0 0-7 7z' fill='%23fbbf24'/%3E%3C/svg%3E" />
+  <style>
+:root {
+  --bg: #0e0f13;
+  --bg-2: #15171d;
+  --bg-3: #1c1f27;
+  --line: #2a2e39;
+  --text: #e8eaf0;
+  --muted: #8a90a0;
+  --accent: #34d399;
+  --accent-2: #60a5fa;
+  --warn: #fbbf24;
+  --danger: #f87171;
+  --perfect: #34d399;
+  --boost: #fb923c;
+  --diagonal: #c084fc;
+  --radius: 10px;
+  --player-h: 128px;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f4f5f8;
+    --bg-2: #ffffff;
+    --bg-3: #eceef3;
+    --line: #d9dce4;
+    --text: #171923;
+    --muted: #5f6577;
+    color-scheme: light;
+}
+}
+
+:root[data-theme="light"] {
+  --bg: #f4f5f8;
+  --bg-2: #ffffff;
+  --bg-3: #eceef3;
+  --line: #d9dce4;
+  --text: #171923;
+  --muted: #5f6577;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+
+[hidden] { display: none !important; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  display: grid;
+  grid-template-rows: auto auto 1fr var(--player-h);
+  overflow: hidden;
+}
+
+button, input, select { font: inherit; color: inherit; }
+
+/* ---------- Barra superior ---------- */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 16px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.brand { display: flex; align-items: center; gap: 10px; font-size: 18px; letter-spacing: .3px; }
+.brand b { color: var(--accent); }
+.logo {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: conic-gradient(#fbbf24 0 25%, #34d399 0 50%, #60a5fa 0 75%, #f472b6 0);
+  -webkit-mask: radial-gradient(circle, transparent 6px, #000 7px);
+          mask: radial-gradient(circle, transparent 6px, #000 7px);
+}
+.actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--bg-3);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #06281c; font-weight: 600; }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn:disabled { opacity: .5; cursor: default; }
+
+.select-label { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+select {
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+
+.menu { position: relative; }
+.menu-list {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 30;
+  min-width: 250px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 6px;
+  box-shadow: 0 12px 30px rgba(0,0,0,.45);
+}
+.menu-list button {
+  display: block; width: 100%; text-align: left;
+  padding: 8px 10px; border: 0; background: none; border-radius: 6px; cursor: pointer;
+}
+.menu-list button:hover { background: var(--bg-3); }
+.menu-list hr { border: 0; border-top: 1px solid var(--line); margin: 6px 0; }
+.danger { color: var(--danger); }
+
+/* ---------- Pestañas ---------- */
+.tabs {
+  display: flex; align-items: center; gap: 4px;
+  padding: 0 16px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--line);
+}
+.tab {
+  border: 0; background: none; cursor: pointer;
+  padding: 10px 14px;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+}
+.tab.active { color: var(--text); border-bottom-color: var(--accent); }
+.queue-status { margin-left: auto; color: var(--muted); font-size: 13px; }
+
+/* ---------- Layout ---------- */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  min-height: 0;
+}
+.view { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.view[hidden] { display: none; }
+
+.toolbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+}
+#search {
+  flex: 1 1 240px;
+  max-width: 420px;
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 10px;
+}
+.chip-toggle, .chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--bg-3);
+  cursor: pointer;
+  font-size: 13px;
+}
+.chip-toggle input { accent-color: var(--accent); }
+.count { color: var(--muted); font-size: 13px; margin-left: auto; }
+
+.table-wrap { position: relative; flex: 1; overflow: auto; min-height: 0; }
+
+table.tracks { width: 100%; border-collapse: collapse; }
+.tracks th {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--bg-2);
+  text-align: left;
+  font-weight: 500;
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  user-select: none;
+  white-space: nowrap;
+}
+.tracks th[data-sort] { cursor: pointer; }
+.tracks th.sorted::after { content: " ▲"; font-size: 10px; }
+.tracks th.sorted.desc::after { content: " ▼"; }
+.tracks td { padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.tracks tbody tr { cursor: pointer; }
+.tracks tbody tr:hover { background: var(--bg-3); }
+.tracks tbody tr.selected { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.tracks tbody tr.selected td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+.tracks tbody tr { user-select: none; }
+.tracks tbody tr.playing .t-title::before { content: "▶ "; color: var(--accent); }
+.c-check { width: 34px; }
+.c-num { width: 42px; color: var(--muted); }
+.c-key { width: 80px; }
+.c-bpm { width: 70px; font-variant-numeric: tabular-nums; }
+.c-energy { width: 130px; }
+.c-dur { width: 80px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.c-status { width: 130px; }
+.t-title { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 46ch; }
+.t-artist { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 46ch; }
+.compat-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+.compat-perfect { background: var(--perfect); }
+.compat-boost { background: var(--boost); }
+.compat-diagonal { background: var(--diagonal); }
+
+.key-chip {
+  display: inline-block;
+  min-width: 44px;
+  text-align: center;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-weight: 700;
+  color: #111;
+  font-variant-numeric: tabular-nums;
+}
+.key-chip.lg { font-size: 30px; padding: 6px 16px; border-radius: 10px; }
+
+.energy-bar { display: flex; gap: 2px; align-items: center; }
+.energy-bar i { width: 7px; height: 12px; border-radius: 2px; background: var(--line); }
+.energy-bar i.on { background: var(--e-color, var(--accent)); }
+.energy-bar b { margin-left: 6px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.status { font-size: 12px; color: var(--muted); }
+.status.error { color: var(--danger); }
+.progress { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; margin-top: 4px; }
+.progress > div { height: 100%; background: var(--accent-2); transition: width .2s; }
+
+.empty {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; padding: 24px; gap: 4px;
+}
+.empty[hidden] { display: none; }
+.empty h2 { margin: 18px 0 4px; font-weight: 600; }
+.empty p { max-width: 520px; margin: 4px 0; }
+.empty-wheel {
+  width: 120px; height: 120px; border-radius: 50%;
+  background: conic-gradient(from -15deg, hsl(75 78% 55%), hsl(105 78% 55%), hsl(135 78% 55%), hsl(165 78% 55%), hsl(195 78% 55%), hsl(225 78% 55%), hsl(255 78% 55%), hsl(285 78% 55%), hsl(315 78% 55%), hsl(345 78% 55%), hsl(15 78% 55%), hsl(45 78% 55%), hsl(75 78% 55%));
+  -webkit-mask: radial-gradient(circle, transparent 32px, #000 33px);
+          mask: radial-gradient(circle, transparent 32px, #000 33px);
+  opacity: .85;
+}
+.muted { color: var(--muted); }
+
+/* ---------- Panel lateral ---------- */
+.side {
+  border-left: 1px solid var(--line);
+  background: var(--bg-2);
+  overflow: auto;
+  min-height: 0;
+}
+.panel { padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.wheel-panel { text-align: center; }
+#wheel { width: 100%; max-width: 280px; display: block; margin: 0 auto; }
+#wheel .seg { cursor: pointer; transition: opacity .15s; }
+#wheel .seg:hover { opacity: 1 !important; filter: brightness(1.15); }
+#wheel text { font-size: 9px; font-weight: 700; fill: #111; pointer-events: none; text-anchor: middle; dominant-baseline: central; }
+#wheel text.count { font-size: 6px; font-weight: 500; }
+#wheel .center-label { fill: var(--text); font-size: 14px; }
+#wheel .center-sub { fill: var(--muted); font-size: 7px; font-weight: 400; }
+.hint { color: var(--muted); font-size: 12px; margin: 6px 0 0; }
+
+.details h3 { margin: 0 0 2px; font-size: 16px; word-break: break-word; }
+.details .artist { color: var(--muted); margin-bottom: 12px; }
+.key-row { display: flex; align-items: center; gap: 14px; margin: 10px 0 14px; }
+.key-alt { font-size: 13px; color: var(--muted); line-height: 1.6; }
+.key-alt b { color: var(--text); }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+.stat { background: var(--bg-3); border-radius: 8px; padding: 8px; }
+.stat .v { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.stat .l { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+.section-title { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin: 14px 0 6px; }
+.chroma { display: grid; grid-template-columns: repeat(12, 1fr); gap: 3px; align-items: end; height: 60px; }
+.chroma div { background: var(--accent-2); border-radius: 2px 2px 0 0; min-height: 2px; opacity: .8; }
+.chroma div.tonic { background: var(--accent); opacity: 1; }
+.chroma-labels { display: grid; grid-template-columns: repeat(12, 1fr); gap: 3px; font-size: 9px; color: var(--muted); text-align: center; margin-top: 2px; }
+.cue-list, .suggest-list { list-style: none; padding: 0; margin: 0; }
+.cue-list li, .suggest-list li {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 6px; border-radius: 6px; cursor: pointer;
+}
+.cue-list li:hover, .suggest-list li:hover { background: var(--bg-3); }
+.cue-num { width: 20px; height: 20px; border-radius: 4px; display: inline-grid; place-items: center; font-size: 11px; font-weight: 700; color: #111; }
+.cue-time { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; }
+.suggest-list .s-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.suggest-list .s-meta { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.tag-box { background: var(--bg-3); border-radius: 8px; padding: 10px; display: grid; gap: 6px; }
+.tag-box label { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.tag-box input { accent-color: var(--accent); }
+.tag-box .btn { justify-content: center; margin-top: 4px; }
+
+.energy-breakdown { display: grid; gap: 4px; font-size: 12px; }
+.eb-row { display: grid; grid-template-columns: 92px 74px minmax(0, 1fr) 32px; gap: 8px; align-items: center; }
+.eb-name { color: var(--muted); }
+.eb-raw, .eb-val { font-variant-numeric: tabular-nums; }
+.eb-val { text-align: right; }
+.eb-bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.eb-bar i { display: block; height: 100%; background: var(--accent-2); }
+.eb-total { margin-top: 4px; font-weight: 600; }
+
+.drone-box { display: grid; gap: 8px; margin-bottom: 14px; }
+.drone-keys { display: flex; flex-wrap: wrap; gap: 6px; }
+.drone-btn {
+  display: grid; gap: 1px; justify-items: start;
+  padding: 6px 10px; min-width: 76px;
+  border-radius: 8px; border: 1px solid var(--line);
+  border-left: 6px solid var(--k);
+  background: var(--bg-3); cursor: pointer; text-align: left;
+}
+.drone-btn b { font-size: 14px; }
+.drone-btn small { color: var(--muted); font-size: 11px; }
+.drone-btn.on { background: var(--k); color: #111; border-color: var(--k); }
+.drone-btn.on small { color: #111; }
+.drone-btn.on b::before { content: "♪ "; }
+.drone-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; font-size: 12px; color: var(--muted); }
+.drone-controls label { display: inline-flex; gap: 6px; align-items: center; }
+.drone-controls input[type="range"] { width: 100px; accent-color: var(--accent); }
+.drone-help { font-size: 12px; color: var(--muted); }
+.drone-help summary { cursor: pointer; color: var(--accent-2); }
+.drone-help ol { margin: 6px 0; padding-left: 18px; display: grid; gap: 4px; }
+.drone-help p { margin: 4px 0 0; }
+
+/* ---------- Constructor de sets ---------- */
+.set-summary { padding: 10px 16px 0; color: var(--muted); font-size: 13px; }
+.energy-curve { width: calc(100% - 32px); height: 70px; margin: 8px 16px 0; flex-shrink: 0; }
+.set-list { list-style: none; margin: 0; padding: 8px 16px 24px; overflow: auto; flex: 1; min-height: 0; counter-reset: set; }
+.set-item {
+  display: grid;
+  grid-template-columns: 28px 64px minmax(0, 1fr) 70px 120px auto;
+  align-items: center; gap: 10px;
+  padding: 8px 10px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.set-item .idx { color: var(--muted); font-variant-numeric: tabular-nums; }
+.set-item .set-actions { display: flex; gap: 4px; }
+.set-item .set-actions button { border: 1px solid var(--line); background: var(--bg-3); border-radius: 6px; padding: 2px 7px; cursor: pointer; }
+.transition { display: flex; align-items: center; gap: 8px; padding: 4px 0 4px 44px; font-size: 12px; color: var(--muted); }
+.transition .badge { padding: 1px 8px; border-radius: 999px; font-weight: 600; color: #111; }
+.badge.perfect { background: var(--perfect); }
+.badge.boost { background: var(--boost); }
+.badge.diagonal { background: var(--diagonal); }
+.badge.clash { background: var(--danger); }
+
+/* ---------- Reproductor ---------- */
+.player {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  padding: 10px 16px;
+  background: var(--bg-2);
+  border-top: 1px solid var(--line);
+  min-width: 0;
+}
+.player-info { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.np-key {
+  width: 58px; height: 58px; border-radius: 12px;
+  display: grid; place-items: center;
+  font-size: 20px; font-weight: 800; color: #111;
+  background: var(--bg-3);
+  flex-shrink: 0;
+}
+.np-text { min-width: 0; }
+.np-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.np-meta { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.player-main { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.transport { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.icon-btn {
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 1px solid var(--line); background: var(--bg-3);
+  cursor: pointer; display: grid; place-items: center;
+}
+.icon-btn.play { background: var(--accent); color: #06281c; border-color: var(--accent); }
+.time { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; min-width: 96px; }
+.cue-buttons { display: flex; gap: 4px; flex-wrap: wrap; }
+.cue-buttons button {
+  min-width: 30px; height: 26px; border-radius: 5px; border: 0; cursor: pointer;
+  font-weight: 700; color: #111; font-size: 12px;
+}
+.cue-buttons button:disabled { background: var(--bg-3) !important; color: var(--muted); cursor: default; }
+#volume { margin-left: auto; width: 100px; accent-color: var(--accent); }
+#waveform { width: 100%; height: 72px; display: block; cursor: pointer; border-radius: 6px; background: var(--bg); }
+
+/* ---------- Superposiciones ---------- */
+.drop-overlay {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(10, 12, 16, .82);
+  display: grid; place-items: center;
+  font-size: 22px; font-weight: 600;
+  border: 3px dashed var(--accent);
+}
+.drop-overlay[hidden] { display: none; }
+.toasts { position: fixed; bottom: calc(var(--player-h) + 12px); right: 16px; display: grid; gap: 8px; z-index: 60; }
+.toast {
+  background: var(--bg-3); border: 1px solid var(--line); border-left: 4px solid var(--accent);
+  padding: 10px 14px; border-radius: 8px; max-width: 360px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.4);
+  animation: toast-in .2s ease-out;
+}
+.toast.error { border-left-color: var(--danger); }
+@keyframes toast-in { from { transform: translateY(8px); opacity: 0; } }
+
+/* ---------- Diálogos ---------- */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 70;
+  background: rgba(10, 12, 16, .6);
+  display: grid; place-items: center; padding: 16px;
+}
+.modal {
+  width: min(560px, 100%);
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 18px; display: grid; gap: 12px;
+  box-shadow: 0 20px 50px rgba(0,0,0,.45);
+}
+.modal h3 { margin: 0; font-size: 16px; }
+.modal p { margin: 0; color: var(--muted); }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.btn.danger { background: var(--danger); border-color: var(--danger); color: #2a0606; font-weight: 600; }
+.export-text {
+  width: 100%; height: 240px; resize: vertical;
+  background: var(--bg); color: var(--text);
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px;
+  font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.empty .btn { margin-top: 14px; }
+:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1000px) {
+  html, body { height: auto; }
+  body { min-height: 100%; overflow: auto; grid-template-rows: auto auto auto auto; }
+  .layout { grid-template-columns: 1fr; min-height: auto; }
+  .side { border-left: 0; border-top: 1px solid var(--line); }
+  .table-wrap { min-height: 50vh; max-height: 70vh; }
+  .player { position: sticky; bottom: 0; grid-template-columns: 1fr; gap: 8px; }
+  .toasts { bottom: 16px; }
+  .c-dur, .c-status, .c-num { display: none; }
+  .set-item { grid-template-columns: 24px 56px minmax(0, 1fr) auto; }
+  .set-item .s-bpm, .set-item .s-energy { display: none; }
+}
+@media (max-width: 600px) {
+  .topbar, .toolbar, .tabs { padding-left: 16px; padding-right: 16px; }
+  .c-energy { width: auto; }
+  .energy-bar i { display: none; }
+  .t-title, .t-artist { max-width: 24ch; }
+  #volume { display: none; }
+}
+
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true"></span>
+      <span class="brand-name">KeyMix <b>Pro</b></span>
+    </div>
+    <div class="actions">
+      <label class="btn primary" title="Añadir archivos de audio (A)">
+        <input id="file-input" type="file" accept="audio/*,.mp3,.wav,.flac,.m4a,.aac,.ogg,.aiff,.aif" multiple hidden />
+        <span>＋ Añadir pistas</span>
+      </label>
+      <button id="btn-folder" class="btn" hidden title="Abrir una carpeta y poder guardar etiquetas en los archivos originales">📁 Abrir carpeta</button>
+      <label class="select-label">Notación
+        <select id="notation">
+          <option value="camelot">Camelot (8A)</option>
+          <option value="openkey">Open Key (1m)</option>
+          <option value="musical">Musical (Am)</option>
+        </select>
+      </label>
+      <div class="menu">
+        <button class="btn" id="btn-export" aria-haspopup="true" aria-expanded="false">Exportar ▾</button>
+        <div class="menu-list" id="export-menu" hidden>
+          <button data-export="csv">Biblioteca como CSV</button>
+          <button data-export="rekordbox">Para Rekordbox (XML con cue points)…</button>
+          <button data-export="json">Biblioteca como JSON</button>
+          <button data-export="copy-tagged">Copiar etiquetadas a otra carpeta… (originales intactos)</button>
+          <button data-export="tag-all">Escribir etiquetas en los originales (MP3, AIFF, WAV)</button>
+          <hr />
+          <button data-export="clear" class="danger">Vaciar biblioteca</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" class="tab active" data-view="library" aria-selected="true">Biblioteca</button>
+    <button role="tab" class="tab" data-view="set" aria-selected="false">Constructor de sets</button>
+    <div class="queue-status" id="queue-status" aria-live="polite"></div>
+  </nav>
+
+  <main class="layout">
+    <section class="view" id="view-library">
+      <div class="toolbar">
+        <input id="search" type="search" placeholder="Buscar título, artista, tonalidad…  (/)" autocomplete="off" />
+        <label class="chip-toggle" title="Muestra solo pistas que mezclan armónicamente con la seleccionada">
+          <input type="checkbox" id="compat-only" /> <span>Solo compatibles</span>
+        </label>
+        <button class="chip" id="key-filter-chip" hidden></button>
+        <span class="count" id="track-count"></span>
+      </div>
+      <div class="table-wrap" id="table-wrap">
+        <table class="tracks" id="track-table">
+          <thead>
+            <tr>
+              <th class="c-check"><input type="checkbox" id="check-all" title="Marcar todas" /></th>
+              <th data-sort="index" class="c-num">#</th>
+              <th data-sort="title">Título</th>
+              <th data-sort="key" class="c-key">Tono</th>
+              <th data-sort="bpm" class="c-bpm">BPM</th>
+              <th data-sort="energy" class="c-energy">Energía</th>
+              <th data-sort="duration" class="c-dur">Duración</th>
+              <th class="c-status">Estado</th>
+            </tr>
+          </thead>
+          <tbody id="track-body"></tbody>
+        </table>
+        <div class="empty" id="empty-state">
+          <div class="empty-wheel" aria-hidden="true"></div>
+          <h2>Arrastra tu música aquí</h2>
+          <p>MP3, WAV, FLAC, AAC/M4A, OGG o AIFF. Todo el análisis se hace en tu navegador: los archivos nunca salen de tu equipo.</p>
+          <p class="muted">Detecta la tonalidad (rueda Camelot), el BPM, el nivel de energía 1–10 y crea hasta 8 cue points en los cambios de sección.</p>
+          <button class="btn primary" id="btn-demo" type="button">Probar con 5 pistas de demostración</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="view-set" hidden>
+      <div class="toolbar set-toolbar">
+        <label class="select-label">Pistas
+          <select id="set-source">
+            <option value="checked">Marcadas en la biblioteca</option>
+            <option value="all">Toda la biblioteca</option>
+          </select>
+        </label>
+        <label class="select-label">Empezar por
+          <select id="set-start"><option value="">La de menor energía</option></select>
+        </label>
+        <button class="btn primary" id="btn-build-set">Generar set armónico</button>
+        <button class="btn" id="btn-set-m3u">Exportar M3U</button>
+        <button class="btn" id="btn-set-csv">Exportar CSV</button>
+      </div>
+      <div class="set-summary" id="set-summary"></div>
+      <svg class="energy-curve" id="energy-curve" preserveAspectRatio="none" aria-label="Curva de energía del set"></svg>
+      <ol class="set-list" id="set-list"></ol>
+    </section>
+
+    <aside class="side" id="side">
+      <div class="panel wheel-panel">
+        <svg id="wheel" viewBox="-110 -110 220 220" role="img" aria-label="Rueda Camelot"></svg>
+        <p class="hint">Haz clic en un sector para filtrar por tonalidad.</p>
+      </div>
+      <div class="panel details" id="details">
+        <p class="muted">Selecciona una pista para ver su análisis.</p>
+      </div>
+    </aside>
+  </main>
+
+  <footer class="player" id="player">
+    <div class="player-info">
+      <div class="np-key" id="np-key">—</div>
+      <div class="np-text">
+        <div class="np-title" id="np-title">Sin pista</div>
+        <div class="np-meta" id="np-meta">Selecciona una pista y pulsa espacio</div>
+      </div>
+    </div>
+    <div class="player-main">
+      <div class="transport">
+        <button class="icon-btn" id="btn-start" title="Al inicio (Inicio)">⏮</button>
+        <button class="icon-btn play" id="btn-play" title="Reproducir / pausa (espacio)">▶</button>
+        <span class="time" id="time">0:00 / 0:00</span>
+        <div class="cue-buttons" id="cue-buttons"></div>
+        <input type="range" id="volume" min="0" max="1" step="0.01" value="0.9" title="Volumen" />
+      </div>
+      <canvas id="waveform" height="72"></canvas>
+    </div>
+    <audio id="audio" preload="auto"></audio>
+  </footer>
+
+  <div class="drop-overlay" id="drop-overlay" hidden><div>Suelta los archivos para analizarlos</div></div>
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <script>
+const KEYMIX_WORKER_URL = URL.createObjectURL(new Blob(["(() => {\n'use strict';\nconst __mods = {};\n__mods[\"camelot\"] = (() => {\n// Notaciones de tonalidad (Camelot, Open Key, musical) y reglas de mezcla armónica.\n\nconst MAJOR_NAMES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];\nconst MINOR_NAMES = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'G#', 'A', 'Bb', 'B'];\n\n/** Número Camelot (1-12) de una tonalidad. tonic: clase de altura 0-11 (C=0). */\nfunction camelotNumber(tonic, mode) {\n  const majorPc = mode === 'major' ? tonic : (tonic + 3) % 12;\n  return ((majorPc * 7) % 12 + 7) % 12 + 1;\n}\n\nfunction camelotCode(tonic, mode) {\n  return `${camelotNumber(tonic, mode)}${mode === 'major' ? 'B' : 'A'}`;\n}\n\nfunction openKeyCode(tonic, mode) {\n  const n = camelotNumber(tonic, mode);\n  return `${((n - 8 + 12) % 12) + 1}${mode === 'major' ? 'd' : 'm'}`;\n}\n\nfunction musicalName(tonic, mode) {\n  return mode === 'major' ? MAJOR_NAMES[tonic] : `${MINOR_NAMES[tonic]}m`;\n}\n\n/** Convierte \"8A\" -> { tonic: 9, mode: 'minor' }. */\nfunction fromCamelot(code) {\n  const m = /^(\\d{1,2})([AB])$/i.exec(String(code).trim());\n  if (!m) return null;\n  const n = Number(m[1]);\n  if (n < 1 || n > 12) return null;\n  const majorPc = (((n - 8) * 7) % 12 + 12) % 12;\n  if (m[2].toUpperCase() === 'B') return { tonic: majorPc, mode: 'major' };\n  return { tonic: (majorPc + 9) % 12, mode: 'minor' };\n}\n\nfunction formatKey(tonic, mode, notation = 'camelot') {\n  if (notation === 'openkey') return openKeyCode(tonic, mode);\n  if (notation === 'musical') return musicalName(tonic, mode);\n  return camelotCode(tonic, mode);\n}\n\n/** Color de la rueda Camelot para un número y letra. */\nfunction keyColor(n, letter, alpha = 1) {\n  const hue = ((n - 1) * 30 + 75) % 360;\n  const light = letter === 'B' ? 62 : 50;\n  return `hsla(${hue}, 78%, ${light}%, ${alpha})`;\n}\n\nfunction parse(code) {\n  const m = /^(\\d{1,2})([AB])$/.exec(code || '');\n  return m ? { n: Number(m[1]), l: m[2] } : null;\n}\n\n/**\n * Relación armónica entre dos claves Camelot (de a hacia b).\n * type: perfect | boost | diagonal | clash\n */\nfunction compatibility(fromCode, toCode) {\n  const a = parse(fromCode);\n  const b = parse(toCode);\n  if (!a || !b) return { type: 'unknown', label: '—', cost: 5 };\n  const d = (((b.n - a.n) % 12) + 12) % 12;\n  if (a.l === b.l) {\n    if (d === 0) return { type: 'perfect', label: 'Misma tonalidad', cost: 0 };\n    if (d === 1) return { type: 'perfect', label: '+1 (dominante)', cost: 1 };\n    if (d === 11) return { type: 'perfect', label: '−1 (subdominante)', cost: 1 };\n    if (d === 2) return { type: 'boost', label: 'Energy boost +2', cost: 2 };\n    if (d === 7) return { type: 'boost', label: 'Subida de semitono +7', cost: 2.5 };\n  } else {\n    if (d === 0) return { type: 'perfect', label: 'Relativa (mayor/menor)', cost: 1 };\n    if (a.l === 'A' && d === 1) return { type: 'diagonal', label: 'Diagonal', cost: 2.5 };\n    if (a.l === 'B' && d === 11) return { type: 'diagonal', label: 'Diagonal', cost: 2.5 };\n  }\n  return { type: 'clash', label: 'Choque armónico', cost: 8 };\n}\n\n/** Todas las claves Camelot compatibles con una dada (incluida ella misma). */\nfunction compatibleCodes(code) {\n  const out = [];\n  for (let n = 1; n <= 12; n++) {\n    for (const l of ['A', 'B']) {\n      const c = `${n}${l}`;\n      const r = compatibility(code, c);\n      if (r.type !== 'clash' && r.type !== 'unknown') out.push({ code: c, ...r });\n    }\n  }\n  return out;\n}\n\n/** Relativa mayor/menor (mismo número, otra letra): 8A ↔ 8B. */\nfunction relativeCode(code) {\n  const m = /^(\\d{1,2})([AB])$/.exec(code || '');\n  return m ? `${m[1]}${m[2] === 'A' ? 'B' : 'A'}` : null;\n}\n\n/**\n * Notas MIDI del tono de referencia de una tonalidad Camelot.\n * mode 'note': tónica en dos octavas. mode 'chord': tónica grave + tríada (mayor o menor).\n * La tónica se sitúa entre Do3 y Si3 (MIDI 48-59), un registro que se oye bien sobre la mezcla.\n */\nfunction referenceMidi(code, mode = 'chord') {\n  const k = fromCamelot(code);\n  if (!k) return [];\n  const root = 48 + k.tonic;\n  if (mode === 'note') return [root - 12, root];\n  return [root - 12, root, root + (k.mode === 'major' ? 4 : 3), root + 7];\n}\n\nreturn { camelotNumber, camelotCode, openKeyCode, musicalName, fromCamelot, formatKey, keyColor, compatibility, compatibleCodes, relativeCode, referenceMidi };\n})();\n\n__mods[\"dsp\"] = (() => {\n// Motor de análisis: tonalidad, BPM, energía, cue points y forma de onda.\n// Sin dependencias; funciona en navegador (Web Worker) y en Node.\n\nconst { camelotCode, openKeyCode, musicalName } = __mods[\"camelot\"];\nconst ANALYSIS_SAMPLE_RATE = 22050;\n\n// ---------------------------------------------------------------- FFT ----\n\nconst fftCache = new Map();\n\nfunction fftTables(n) {\n  let t = fftCache.get(n);\n  if (t) return t;\n  const levels = Math.round(Math.log2(n));\n  if (1 << levels !== n) throw new Error('El tamaño de la FFT debe ser potencia de 2');\n  const rev = new Uint32Array(n);\n  for (let i = 0; i < n; i++) {\n    let r = 0;\n    let x = i;\n    for (let j = 0; j < levels; j++) {\n      r = (r << 1) | (x & 1);\n      x >>= 1;\n    }\n    rev[i] = r;\n  }\n  const cos = new Float64Array(n / 2);\n  const sin = new Float64Array(n / 2);\n  for (let i = 0; i < n / 2; i++) {\n    cos[i] = Math.cos((2 * Math.PI * i) / n);\n    sin[i] = Math.sin((2 * Math.PI * i) / n);\n  }\n  t = { rev, cos, sin };\n  fftCache.set(n, t);\n  return t;\n}\n\n/** FFT compleja radix-2 in situ (signo negativo). */\nfunction fft(re, im) {\n  const n = re.length;\n  const { rev, cos, sin } = fftTables(n);\n  for (let i = 0; i < n; i++) {\n    const j = rev[i];\n    if (j > i) {\n      let t = re[i]; re[i] = re[j]; re[j] = t;\n      t = im[i]; im[i] = im[j]; im[j] = t;\n    }\n  }\n  for (let size = 2; size <= n; size <<= 1) {\n    const half = size >> 1;\n    const step = n / size;\n    for (let i = 0; i < n; i += size) {\n      for (let j = i, k = 0; j < i + half; j++, k += step) {\n        const l = j + half;\n        const tre = re[l] * cos[k] + im[l] * sin[k];\n        const tim = im[l] * cos[k] - re[l] * sin[k];\n        re[l] = re[j] - tre;\n        im[l] = im[j] - tim;\n        re[j] += tre;\n        im[j] += tim;\n      }\n    }\n  }\n}\n\nfunction hann(n) {\n  const w = new Float64Array(n);\n  for (let i = 0; i < n; i++) w[i] = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (n - 1));\n  return w;\n}\n\nconst clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);\nconst db = (p) => 10 * Math.log10(p + 1e-12);\n\nfunction interp(arr, x) {\n  const i = Math.floor(x);\n  if (i < 0 || i + 1 >= arr.length) return 0;\n  const f = x - i;\n  return arr[i] * (1 - f) + arr[i + 1] * f;\n}\n\n// ------------------------------------------------- Características STFT ----\n\nfunction shortTimeFeatures(x, sr, progress) {\n  const N = 1024;\n  const H = 256;\n  const half = N / 2;\n  const n = Math.max(1, Math.floor((x.length - N) / H) + 1);\n  const win = hann(N);\n  const re = new Float64Array(N);\n  const im = new Float64Array(N);\n  const prev = new Float64Array(half);\n  const odf = new Float32Array(n);\n  const lowOdf = new Float32Array(n);\n  const rms = new Float32Array(n);\n  const low = new Float32Array(n);\n  const mid = new Float32Array(n);\n  const high = new Float32Array(n);\n  const centroid = new Float32Array(n);\n  const binHz = sr / N;\n  const lowEnd = Math.round(200 / binHz);\n  const kickEnd = Math.max(2, Math.round(160 / binHz));\n  const midEnd = Math.round(4000 / binHz);\n\n  for (let f = 0; f < n; f++) {\n    const off = f * H;\n    let sq = 0;\n    for (let i = 0; i < N; i++) {\n      const s = x[off + i] || 0;\n      sq += s * s;\n      re[i] = s * win[i];\n      im[i] = 0;\n    }\n    rms[f] = Math.sqrt(sq / N);\n    fft(re, im);\n    let flux = 0, kflux = 0, lo = 0, mi = 0, hi = 0, num = 0, den = 0;\n    for (let k = 1; k < half; k++) {\n      const p = re[k] * re[k] + im[k] * im[k];\n      const m = Math.sqrt(p);\n      const lm = Math.log1p(100 * m);\n      const d = lm - prev[k];\n      if (d > 0) {\n        flux += d;\n        if (k < kickEnd) kflux += d;\n      }\n      prev[k] = lm;\n      if (k < lowEnd) lo += p;\n      else if (k < midEnd) mi += p;\n      else hi += p;\n      num += k * binHz * m;\n      den += m;\n    }\n    odf[f] = f === 0 ? 0 : flux;\n    lowOdf[f] = f === 0 ? 0 : kflux;\n    low[f] = lo;\n    mid[f] = mi;\n    high[f] = hi;\n    centroid[f] = den > 0 ? num / den : 0;\n    if ((f & 2047) === 0) progress(f / n);\n  }\n  return { odf, lowOdf, rms, low, mid, high, centroid, n, hop: H, frameSize: N, fps: sr / H, sr };\n}\n\nconst frameTime = (feat, f) => (f * feat.hop + feat.frameSize / 2) / feat.sr;\nconst timeFrame = (feat, t) => (t * feat.sr - feat.frameSize / 2) / feat.hop;\n\n// -------------------------------------------------------------- Tempo ----\n\nconst MIN_BPM = 80;\nconst MAX_BPM = 180;\n\nfunction combScore(sm, period, phaseStep = 1) {\n  let best = -Infinity;\n  let bestPhase = 0;\n  const n = sm.length;\n  for (let ph = 0; ph < period; ph += phaseStep) {\n    let s = 0;\n    let c = 0;\n    for (let t = ph; t < n - 1; t += period) {\n      const i = t | 0;\n      const fr = t - i;\n      s += sm[i] * (1 - fr) + sm[i + 1] * fr;\n      c++;\n    }\n    if (c && s / c > best) {\n      best = s / c;\n      bestPhase = ph;\n    }\n  }\n  return { score: best, phase: bestPhase };\n}\n\n/** Resta de la media local (±0,5 s) + rectificación de media onda. */\nfunction detrend(raw, fps) {\n  const n = raw.length;\n  const prefix = new Float64Array(n + 1);\n  for (let i = 0; i < n; i++) prefix[i + 1] = prefix[i] + raw[i];\n  const w = Math.max(1, Math.round(fps * 0.5));\n  const out = new Float32Array(n);\n  for (let i = 0; i < n; i++) {\n    const a = Math.max(0, i - w);\n    const b = Math.min(n, i + w + 1);\n    const v = raw[i] - (prefix[b] - prefix[a]) / (b - a);\n    out[i] = v > 0 ? v : 0;\n  }\n  return out;\n}\n\nfunction smooth3(x) {\n  const n = x.length;\n  const out = new Float32Array(n);\n  for (let i = 0; i < n; i++) out[i] = 0.25 * (x[i - 1] || 0) + 0.5 * x[i] + 0.25 * (x[i + 1] || 0);\n  return out;\n}\n\nfunction mean(x) {\n  let s = 0;\n  for (let i = 0; i < x.length; i++) s += x[i];\n  return s / Math.max(1, x.length);\n}\n\nfunction estimateTempo(feat) {\n  const fps = feat.fps;\n  const odf = detrend(feat.odf, fps);\n  const n = odf.length;\n\n  // Autocorrelación.\n  const maxLag = Math.min(n - 1, Math.ceil(((fps * 60) / MIN_BPM) * 4) + 2);\n  const ac = new Float32Array(maxLag + 1);\n  for (let lag = 0; lag <= maxLag; lag++) {\n    let s = 0;\n    for (let i = 0; i + lag < n; i++) s += odf[i] * odf[i + lag];\n    ac[lag] = s / (n - lag);\n  }\n  if (ac[0] <= 0) return { bpm: 0, period: 0, phase: 0, confidence: 0, odf };\n  for (let lag = maxLag; lag >= 0; lag--) ac[lag] /= ac[0];\n\n  // Búsqueda gruesa con refuerzo de armónicos del periodo.\n  let coarse = 120;\n  let coarseScore = -Infinity;\n  for (let bpm = MIN_BPM; bpm < MAX_BPM; bpm += 0.25) {\n    const L = (60 * fps) / bpm;\n    const prior = Math.exp(-0.5 * (Math.log2(bpm / 125) / 1.2) ** 2);\n    const s = (interp(ac, L) + 0.5 * interp(ac, 2 * L) + 0.25 * interp(ac, 4 * L)) * (0.85 + 0.15 * prior);\n    if (s > coarseScore) {\n      coarseScore = s;\n      coarse = bpm;\n    }\n  }\n\n  // Error de octava: si el doble de tempo también tiene periodicidad fuerte, se prefiere\n  // (p. ej. drum & bass a 174 en lugar de 87).\n  const Lc = (60 * fps) / coarse;\n  if (coarse * 2 < MAX_BPM && interp(ac, Lc / 2) >= 0.75 * interp(ac, Lc)) coarse *= 2;\n\n  // Refinado con filtro peine sobre toda la pista.\n  const sm = smooth3(smooth3(odf));\n  let bestBpm = coarse;\n  let best = { score: -Infinity, phase: 0 };\n  for (let bpm = coarse - 1; bpm <= coarse + 1; bpm += 0.02) {\n    const r = combScore(sm, (60 * fps) / bpm, 0.5);\n    if (r.score > best.score) {\n      best = r;\n      bestBpm = bpm;\n    }\n  }\n  // Preferir el entero cercano si puntúa casi igual (la mayoría de producciones usan BPM enteros).\n  const rounded = Math.round(bestBpm);\n  if (Math.abs(rounded - bestBpm) < 0.15) {\n    const r = combScore(sm, (60 * fps) / rounded, 0.5);\n    if (r.score >= best.score * 0.97) {\n      best = r;\n      bestBpm = rounded;\n    }\n  }\n  const period = (60 * fps) / bestBpm;\n  const confidence = clamp01((combScore(sm, period, 0.5).score / (mean(sm) + 1e-9) - 1) / 3);\n  // Fase: el bombo (flujo de graves) marca el tiempo mejor que los charles a contratiempo.\n  const kick = smooth3(detrend(feat.lowOdf, fps));\n  const kickFit = combScore(kick, period, 0.25);\n  const phase = kickFit.score / (mean(kick) + 1e-9) > 1.5 ? kickFit.phase : combScore(sm, period, 0.25).phase;\n  return { bpm: Math.round(bestBpm * 100) / 100, period, phase, confidence };\n}\n\n// --------------------------------------------------------- Tonalidad ----\n\n// Perfiles de Krumhansl-Kessler y Temperley (C como tónica).\nconst KK_MAJOR = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88];\nconst KK_MINOR = [6.33, 2.68, 3.52, 5.38, 2.6, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];\nconst TP_MAJOR = [0.748, 0.06, 0.488, 0.082, 0.67, 0.46, 0.096, 0.715, 0.104, 0.366, 0.057, 0.4];\nconst TP_MINOR = [0.712, 0.084, 0.474, 0.618, 0.049, 0.46, 0.105, 0.747, 0.404, 0.067, 0.133, 0.33];\n\nfunction pearson(a, b, rot) {\n  let ma = 0, mb = 0;\n  for (let i = 0; i < 12; i++) { ma += a[i]; mb += b[i]; }\n  ma /= 12; mb /= 12;\n  let num = 0, da = 0, dbb = 0;\n  for (let i = 0; i < 12; i++) {\n    const x = a[(i + rot) % 12] - ma;\n    const y = b[i] - mb;\n    num += x * y; da += x * x; dbb += y * y;\n  }\n  return num / Math.sqrt(da * dbb + 1e-12);\n}\n\nfunction keyFromChroma(chroma) {\n  const scores = [];\n  for (let t = 0; t < 12; t++) {\n    scores.push({ tonic: t, mode: 'major', score: 0.5 * pearson(chroma, KK_MAJOR, t) + 0.5 * pearson(chroma, TP_MAJOR, t) });\n    scores.push({ tonic: t, mode: 'minor', score: 0.5 * pearson(chroma, KK_MINOR, t) + 0.5 * pearson(chroma, TP_MINOR, t) });\n  }\n  scores.sort((a, b) => b.score - a.score);\n  return scores;\n}\n\nfunction estimateKey(x, sr, progress) {\n  const N = 1 << Math.round(Math.log2(sr / 1.35));\n  const H = N / 2;\n  const binHz = sr / N;\n  const kMin = Math.max(2, Math.ceil(52 / binHz));\n  const kMax = Math.min(N / 2 - 2, Math.floor(1800 / binHz));\n  const win = hann(N);\n  const re = new Float64Array(N);\n  const im = new Float64Array(N);\n  const mag = new Float64Array(N / 2);\n  const nFrames = Math.max(1, Math.floor((x.length - N) / H) + 1);\n  const frames = [];\n  let tc = 0, ts = 0;\n\n  for (let f = 0; f < nFrames; f++) {\n    const off = f * H;\n    let sq = 0;\n    for (let i = 0; i < N; i++) {\n      const s = x[off + i] || 0;\n      sq += s * s;\n      re[i] = s * win[i];\n      im[i] = 0;\n    }\n    if (sq / N < 1e-6) continue; // silencio (< -60 dBFS)\n    fft(re, im);\n    let maxM = 0;\n    for (let k = kMin - 1; k <= kMax + 1; k++) {\n      mag[k] = Math.sqrt(re[k] * re[k] + im[k] * im[k]);\n      if (mag[k] > maxM) maxM = mag[k];\n    }\n    const thr = maxM * 0.02;\n    const peaks = [];\n    for (let k = kMin; k <= kMax; k++) {\n      const b = mag[k];\n      if (b < thr || b <= mag[k - 1] || b < mag[k + 1]) continue;\n      const a = Math.log(mag[k - 1] + 1e-12);\n      const c = Math.log(mag[k + 1] + 1e-12);\n      const lb = Math.log(b);\n      const den = a - 2 * lb + c;\n      const delta = den !== 0 ? (0.5 * (a - c)) / den : 0;\n      const freq = (k + delta) * binHz;\n      const midi = 69 + 12 * Math.log2(freq / 440);\n      const w = Math.sqrt(b);\n      peaks.push(midi, w);\n      const ang = 2 * Math.PI * (midi - Math.round(midi));\n      tc += w * Math.cos(ang);\n      ts += w * Math.sin(ang);\n    }\n    if (peaks.length) frames.push(peaks);\n    if ((f & 31) === 0) progress(f / nFrames);\n  }\n\n  // Desafinación global (en semitonos) respecto a A=440.\n  const tuning = Math.atan2(ts, tc) / (2 * Math.PI);\n  const chroma = new Float64Array(12);\n  const bass = new Float64Array(12);\n  for (const peaks of frames) {\n    const fc = new Float64Array(12);\n    const fb = new Float64Array(12);\n    let sum = 0;\n    for (let i = 0; i < peaks.length; i += 2) {\n      const m = peaks[i] - tuning;\n      const r = Math.round(m);\n      const closeness = Math.cos(Math.PI * (m - r)) ** 2;\n      const w = peaks[i + 1] * closeness;\n      const pc = ((r % 12) + 12) % 12;\n      fc[pc] += w;\n      if (r < 55) fb[pc] += w; // por debajo de G3: línea de bajo\n      sum += w;\n    }\n    if (sum <= 0) continue;\n    for (let i = 0; i < 12; i++) {\n      chroma[i] += fc[i] / sum;\n      bass[i] += fb[i] / sum;\n    }\n  }\n  const total = chroma.reduce((a, b) => a + b, 0);\n  if (total <= 0) return null;\n  // La línea de bajo refuerza la tónica.\n  const combined = new Float64Array(12);\n  for (let i = 0; i < 12; i++) combined[i] = chroma[i] + 0.35 * bass[i];\n  const bassMax = Math.max(...bass) || 1;\n  const ranking = keyFromChroma(combined)\n    .map((r) => ({ ...r, score: r.score + 0.08 * (bass[r.tonic] / bassMax) }))\n    .sort((a, b) => b.score - a.score);\n  const best = ranking[0];\n  const second = ranking[1];\n  const confidence = clamp01((best.score - second.score) / 0.12) * 0.6 + clamp01(best.score) * 0.4;\n  const mx = Math.max(...combined);\n  return {\n    tonic: best.tonic,\n    mode: best.mode,\n    score: best.score,\n    confidence,\n    tuningCents: Math.round(tuning * 100),\n    chroma: Array.from(combined, (v) => v / mx),\n    alternatives: ranking.slice(1, 3).map((r) => camelotCode(r.tonic, r.mode)),\n  };\n}\n\n// ------------------------------------------------------ Rejilla de beats ----\n\nfunction buildBeatGrid(tempo, feat, duration) {\n  if (!tempo.bpm) return { bpm: 0, beats: [], firstBeat: 0, downbeat: 0, beatLoud: [], beatLow: [] };\n  const beatSec = 60 / tempo.bpm;\n  let first = frameTime(feat, tempo.phase);\n  first -= Math.floor((first + 0.05) / beatSec) * beatSec; // tolera un beat detectado unos ms antes de 0\n  const beats = [];\n  for (let t = first; t + beatSec <= duration; t += beatSec) beats.push(t);\n\n  // Volumen y graves por beat.\n  const beatLoud = [];\n  const beatLow = [];\n  for (let i = 0; i < beats.length; i++) {\n    const a = Math.max(0, Math.round(timeFrame(feat, beats[i])));\n    const b = Math.min(feat.n, Math.round(timeFrame(feat, beats[i] + beatSec)));\n    let p = 0, l = 0, c = 0;\n    for (let f = a; f < b; f++) {\n      p += feat.rms[f] * feat.rms[f];\n      l += feat.low[f];\n      c++;\n    }\n    beatLoud.push(c ? db(p / c) : -120);\n    beatLow.push(c ? db(l / c) : -120);\n  }\n  const maxLoud = Math.max(...beatLoud);\n  const maxLow = Math.max(...beatLow);\n  for (let i = 0; i < beats.length; i++) {\n    beatLoud[i] = Math.max(maxLoud - 60, beatLoud[i]);\n    beatLow[i] = Math.max(-60, beatLow[i] - maxLow);\n  }\n\n  // Primer tiempo de compás: el desplazamiento cuyos límites de compás concentran más cambios.\n  let downbeat = 0;\n  let bestScore = -Infinity;\n  for (let o = 0; o < 4; o++) {\n    let s = 0;\n    let prev = null;\n    for (let i = o; i + 4 <= beats.length; i += 4) {\n      let e = 0;\n      for (let j = 0; j < 4; j++) e += beatLoud[i + j] + beatLow[i + j];\n      e /= 4;\n      if (prev !== null) s += (e - prev) ** 2; // cuadrado: premia cambios nítidos en el límite de compás\n      prev = e;\n    }\n    if (s > bestScore) {\n      bestScore = s;\n      downbeat = o;\n    }\n  }\n  return { bpm: tempo.bpm, beats, firstBeat: first, downbeat, beatLoud, beatLow };\n}\n\n// ------------------------------------------------------------ Energía ----\n\nfunction estimateEnergy(feat, bpm, duration) {\n  const n = feat.n;\n  const powers = new Float64Array(n);\n  for (let i = 0; i < n; i++) powers[i] = feat.rms[i] * feat.rms[i];\n  const sorted = Float64Array.from(powers).sort();\n  const top = sorted.subarray(Math.floor(n * 0.5));\n  let mp = 0;\n  for (let i = 0; i < top.length; i++) mp += top[i];\n  const loudDb = db(mp / Math.max(1, top.length));\n\n  // Proporción de la pista cerca del nivel máximo (secciones intensas).\n  const thr = Math.pow(10, (loudDb - 6) / 10);\n  let loudFrames = 0;\n  let cSum = 0;\n  for (let i = 0; i < n; i++) {\n    if (powers[i] >= thr) {\n      loudFrames++;\n      cSum += feat.centroid[i];\n    }\n  }\n  const fullness = loudFrames / n;\n  const centroid = loudFrames ? cSum / loudFrames : 0;\n\n  // Densidad de ataques por segundo.\n  const odf = feat.odf;\n  const so = Float32Array.from(odf).sort();\n  const median = so[Math.floor(n / 2)] || 0;\n  const p90 = so[Math.floor(n * 0.9)] || 0;\n  const onsetThr = median + 0.5 * (p90 - median);\n  const minGap = Math.round(feat.fps * 0.08);\n  let onsets = 0;\n  let last = -minGap;\n  for (let i = 1; i < n - 1; i++) {\n    if (odf[i] > onsetThr && odf[i] >= odf[i - 1] && odf[i] >= odf[i + 1] && i - last >= minGap) {\n      onsets++;\n      last = i;\n    }\n  }\n  const density = onsets / Math.max(1, duration);\n\n  return energyFromFeatures({ loudnessDb: loudDb, onsetsPerSec: density, centroidHz: centroid, fullness, bpm });\n}\n\n/**\n * Nivel de energía 1-10 a partir de las medidas de la pista. Separado del análisis para poder\n * recalcular pistas ya analizadas cuando cambia la fórmula.\n *\n * Calibración: los másteres modernos suenan todos fuertes, así que el volumen pesa poco y lo que\n * más distingue es el brillo (un deep house es oscuro, un peak-time techno brillante) y el tempo\n * dentro del rango de baile. La curva final (^1,3) reserva los valores altos para pistas que\n * puntúan alto en casi todo. Referencia: «Frink - Deeply» (deep house, 124 BPM, energía baja) → 4.\n */\nfunction energyFromFeatures({ loudnessDb, onsetsPerSec, centroidHz, fullness, bpm }) {\n  const L = clamp01((loudnessDb + 22) / 16);\n  const D = clamp01((onsetsPerSec - 2) / 7);\n  const C = clamp01((centroidHz - 1200) / 2000);\n  const B = clamp01((bpm - 110) / 40);\n  const F = clamp01(fullness / 0.7);\n  const score = 0.2 * L + 0.15 * D + 0.3 * C + 0.2 * B + 0.15 * F;\n  const level = Math.max(1, Math.min(10, Math.round(1 + 9 * score ** 1.3)));\n  const r2 = (v) => Math.round(v * 100) / 100;\n  return {\n    level,\n    score: r2(score),\n    loudnessDb: Math.round(loudnessDb * 10) / 10,\n    onsetsPerSec: Math.round(onsetsPerSec * 10) / 10,\n    centroidHz: Math.round(centroidHz),\n    fullness: r2(fullness),\n    parts: { L: r2(L), D: r2(D), C: r2(C), B: r2(B), F: r2(F) },\n    weights: { L: 20, D: 15, C: 30, B: 20, F: 15 },\n  };\n}\n\n// --------------------------------------------------------- Cue points ----\n\nfunction detectCues(grid, duration, maxCues = 8) {\n  const { beats, downbeat, beatLoud, beatLow } = grid;\n  if (!beats.length) return [{ time: 0, label: 'Inicio', kind: 'intro' }];\n  const bars = [];\n  for (let i = downbeat; i + 4 <= beats.length; i += 4) {\n    let e = 0;\n    for (let j = 0; j < 4; j++) e += 0.5 * beatLoud[i + j] + 0.5 * beatLow[i + j];\n    bars.push({ beat: i, time: beats[i], e: e / 4 });\n  }\n  // Primer compás con sonido.\n  const peak = Math.max(...bars.map((b) => b.e), -120);\n  let startBar = bars.findIndex((b) => b.e > peak - 30);\n  if (startBar < 0) startBar = 0;\n  const cues = [{ time: bars.length ? bars[startBar].time : beats[0], label: 'Intro', kind: 'intro', bar: startBar }];\n\n  const W = 8;\n  const cands = [];\n  for (let b = startBar + 2; b < bars.length - 1; b++) {\n    const pa = Math.max(startBar, b - W);\n    const nb = Math.min(bars.length, b + W);\n    if (b - pa < 2 || nb - b < 4) continue;\n    let before = 0, after = 0;\n    for (let i = pa; i < b; i++) before += bars[i].e;\n    for (let i = b; i < nb; i++) after += bars[i].e;\n    const nov = after / (nb - b) - before / (b - pa);\n    const rel = b - startBar;\n    const bonus = rel % 8 === 0 ? 1.3 : rel % 4 === 0 ? 1.12 : 1;\n    cands.push({ b, nov, score: Math.abs(nov) * bonus });\n  }\n  // Solo máximos locales de novedad (±3 compases).\n  const byBar = new Map(cands.map((c) => [c.b, c]));\n  for (const c of cands) {\n    for (let d = -3; d <= 3; d++) {\n      const o = byBar.get(c.b + d);\n      if (d && o && Math.abs(o.nov) > Math.abs(c.nov)) c.score = 0;\n    }\n  }\n  cands.sort((x, y) => y.score - x.score);\n  const chosen = [];\n  for (const c of cands) {\n    if (chosen.length >= maxCues - 1) break;\n    if (Math.abs(c.nov) < 1.5) break;\n    if (Math.abs(c.b - startBar) < 8) continue;\n    if (chosen.some((o) => Math.abs(o.b - c.b) < 8)) continue;\n    chosen.push(c);\n  }\n  chosen.sort((x, y) => x.b - y.b);\n  for (const c of chosen) {\n    const t = bars[c.b].time;\n    let label, kind;\n    if (c.nov > 0) {\n      if (c.nov >= 4) { label = 'Drop'; kind = 'drop'; }\n      else { label = 'Subida'; kind = 'build'; }\n    } else if (t > duration * 0.8) { label = 'Outro'; kind = 'outro'; }\n    else { label = 'Break'; kind = 'break'; }\n    cues.push({ time: t, label, kind, bar: c.b });\n  }\n  return cues.map((c) => ({ ...c, time: Math.max(0, Math.round(c.time * 1000) / 1000) }));\n}\n\n// ----------------------------------------------------- Forma de onda ----\n\nfunction buildWaveform(x, feat, cols = 1000) {\n  const peaks = new Uint8Array(cols);\n  const low = new Uint8Array(cols);\n  const mid = new Uint8Array(cols);\n  const high = new Uint8Array(cols);\n  const spc = x.length / cols;\n  let gmax = 1e-9;\n  const raw = new Float32Array(cols);\n  for (let c = 0; c < cols; c++) {\n    const a = Math.floor(c * spc);\n    const b = Math.min(x.length, Math.floor((c + 1) * spc));\n    let m = 0;\n    for (let i = a; i < b; i++) {\n      const v = x[i] < 0 ? -x[i] : x[i];\n      if (v > m) m = v;\n    }\n    raw[c] = m;\n    if (m > gmax) gmax = m;\n    const fa = Math.max(0, Math.floor(timeFrame(feat, a / feat.sr)));\n    const fb = Math.min(feat.n, Math.max(fa + 1, Math.ceil(timeFrame(feat, b / feat.sr))));\n    let l = 0, md = 0, h = 0;\n    for (let f = fa; f < fb; f++) { l += feat.low[f]; md += feat.mid[f]; h += feat.high[f]; }\n    l = Math.sqrt(l); md = Math.sqrt(md) * 1.6; h = Math.sqrt(h) * 4;\n    const s = l + md + h || 1;\n    low[c] = Math.round((l / s) * 255);\n    mid[c] = Math.round((md / s) * 255);\n    high[c] = Math.round((h / s) * 255);\n  }\n  for (let c = 0; c < cols; c++) peaks[c] = Math.round((raw[c] / gmax) * 255);\n  return { peaks, low, mid, high };\n}\n\n// ------------------------------------------------------------- API ----\n\n/**\n * Analiza una señal mono (Float32Array) y devuelve tonalidad, BPM, energía, cues y forma de onda.\n */\nfunction analyzeTrack(samples, sampleRate = ANALYSIS_SAMPLE_RATE, onProgress = () => {}) {\n  if (samples.length < sampleRate * 3) throw new Error('El audio es demasiado corto (mínimo 3 segundos).');\n  const duration = samples.length / sampleRate;\n  onProgress(0.01, 'Extrayendo características');\n  const feat = shortTimeFeatures(samples, sampleRate, (p) => onProgress(0.01 + p * 0.39, 'Extrayendo características'));\n  onProgress(0.4, 'Detectando tempo');\n  const tempo = estimateTempo(feat);\n  onProgress(0.5, 'Detectando tonalidad');\n  const key = estimateKey(samples, sampleRate, (p) => onProgress(0.5 + p * 0.4, 'Detectando tonalidad'));\n  onProgress(0.92, 'Calculando energía y cue points');\n  const grid = buildBeatGrid(tempo, feat, duration);\n  const energy = estimateEnergy(feat, tempo.bpm, duration);\n  const cues = detectCues(grid, duration);\n  const waveform = buildWaveform(samples, feat);\n  onProgress(1, 'Listo');\n  return {\n    version: 1,\n    duration,\n    bpm: tempo.bpm,\n    bpmConfidence: Math.round(tempo.confidence * 100) / 100,\n    key: key && {\n      tonic: key.tonic,\n      mode: key.mode,\n      camelot: camelotCode(key.tonic, key.mode),\n      openKey: openKeyCode(key.tonic, key.mode),\n      musical: musicalName(key.tonic, key.mode),\n      confidence: Math.round(key.confidence * 100) / 100,\n      tuningCents: key.tuningCents,\n      chroma: key.chroma.map((v) => Math.round(v * 1000) / 1000),\n      alternatives: key.alternatives,\n    },\n    energy: energy.level,\n    energyDetail: energy,\n    beatGrid: { firstBeat: Math.round(grid.firstBeat * 1000) / 1000, downbeat: grid.downbeat, bpm: grid.bpm },\n    cues,\n    waveform,\n  };\n}\n\nreturn { ANALYSIS_SAMPLE_RATE, fft, MIN_BPM, MAX_BPM, keyFromChroma, energyFromFeatures, analyzeTrack };\n})();\n\n__mods[\"worker\"] = (() => {\n// Web Worker: ejecuta el análisis fuera del hilo principal.\nconst { analyzeTrack } = __mods[\"dsp\"];\nself.onmessage = (e) => {\n  const { id, samples, sampleRate } = e.data;\n  let lastSent = -1;\n  try {\n    const result = analyzeTrack(samples, sampleRate, (progress, stage) => {\n      if (progress - lastSent >= 0.02 || progress === 1) {\n        lastSent = progress;\n        self.postMessage({ id, type: 'progress', progress, stage });\n      }\n    });\n    const w = result.waveform;\n    self.postMessage({ id, type: 'done', result }, [w.peaks.buffer, w.low.buffer, w.mid.buffer, w.high.buffer]);\n  } catch (err) {\n    self.postMessage({ id, type: 'error', error: err?.message || String(err) });\n  }\n};\n\nreturn {  };\n})();\n\n})();\n"], { type: 'text/javascript' }));
+(() => {
+'use strict';
+const __mods = {};
+__mods["camelot"] = (() => {
+// Notaciones de tonalidad (Camelot, Open Key, musical) y reglas de mezcla armónica.
+
+const MAJOR_NAMES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+const MINOR_NAMES = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'G#', 'A', 'Bb', 'B'];
+
+/** Número Camelot (1-12) de una tonalidad. tonic: clase de altura 0-11 (C=0). */
+function camelotNumber(tonic, mode) {
+  const majorPc = mode === 'major' ? tonic : (tonic + 3) % 12;
+  return ((majorPc * 7) % 12 + 7) % 12 + 1;
+}
+
+function camelotCode(tonic, mode) {
+  return `${camelotNumber(tonic, mode)}${mode === 'major' ? 'B' : 'A'}`;
+}
+
+function openKeyCode(tonic, mode) {
+  const n = camelotNumber(tonic, mode);
+  return `${((n - 8 + 12) % 12) + 1}${mode === 'major' ? 'd' : 'm'}`;
+}
+
+function musicalName(tonic, mode) {
+  return mode === 'major' ? MAJOR_NAMES[tonic] : `${MINOR_NAMES[tonic]}m`;
+}
+
+/** Convierte "8A" -> { tonic: 9, mode: 'minor' }. */
+function fromCamelot(code) {
+  const m = /^(\d{1,2})([AB])$/i.exec(String(code).trim());
+  if (!m) return null;
+  const n = Number(m[1]);
+  if (n < 1 || n > 12) return null;
+  const majorPc = (((n - 8) * 7) % 12 + 12) % 12;
+  if (m[2].toUpperCase() === 'B') return { tonic: majorPc, mode: 'major' };
+  return { tonic: (majorPc + 9) % 12, mode: 'minor' };
+}
+
+function formatKey(tonic, mode, notation = 'camelot') {
+  if (notation === 'openkey') return openKeyCode(tonic, mode);
+  if (notation === 'musical') return musicalName(tonic, mode);
+  return camelotCode(tonic, mode);
+}
+
+/** Color de la rueda Camelot para un número y letra. */
+function keyColor(n, letter, alpha = 1) {
+  const hue = ((n - 1) * 30 + 75) % 360;
+  const light = letter === 'B' ? 62 : 50;
+  return `hsla(${hue}, 78%, ${light}%, ${alpha})`;
+}
+
+function parse(code) {
+  const m = /^(\d{1,2})([AB])$/.exec(code || '');
+  return m ? { n: Number(m[1]), l: m[2] } : null;
+}
+
+/**
+ * Relación armónica entre dos claves Camelot (de a hacia b).
+ * type: perfect | boost | diagonal | clash
+ */
+function compatibility(fromCode, toCode) {
+  const a = parse(fromCode);
+  const b = parse(toCode);
+  if (!a || !b) return { type: 'unknown', label: '—', cost: 5 };
+  const d = (((b.n - a.n) % 12) + 12) % 12;
+  if (a.l === b.l) {
+    if (d === 0) return { type: 'perfect', label: 'Misma tonalidad', cost: 0 };
+    if (d === 1) return { type: 'perfect', label: '+1 (dominante)', cost: 1 };
+    if (d === 11) return { type: 'perfect', label: '−1 (subdominante)', cost: 1 };
+    if (d === 2) return { type: 'boost', label: 'Energy boost +2', cost: 2 };
+    if (d === 7) return { type: 'boost', label: 'Subida de semitono +7', cost: 2.5 };
+  } else {
+    if (d === 0) return { type: 'perfect', label: 'Relativa (mayor/menor)', cost: 1 };
+    if (a.l === 'A' && d === 1) return { type: 'diagonal', label: 'Diagonal', cost: 2.5 };
+    if (a.l === 'B' && d === 11) return { type: 'diagonal', label: 'Diagonal', cost: 2.5 };
+  }
+  return { type: 'clash', label: 'Choque armónico', cost: 8 };
+}
+
+/** Todas las claves Camelot compatibles con una dada (incluida ella misma). */
+function compatibleCodes(code) {
+  const out = [];
+  for (let n = 1; n <= 12; n++) {
+    for (const l of ['A', 'B']) {
+      const c = `${n}${l}`;
+      const r = compatibility(code, c);
+      if (r.type !== 'clash' && r.type !== 'unknown') out.push({ code: c, ...r });
+    }
+  }
+  return out;
+}
+
+/** Relativa mayor/menor (mismo número, otra letra): 8A ↔ 8B. */
+function relativeCode(code) {
+  const m = /^(\d{1,2})([AB])$/.exec(code || '');
+  return m ? `${m[1]}${m[2] === 'A' ? 'B' : 'A'}` : null;
+}
+
+/**
+ * Notas MIDI del tono de referencia de una tonalidad Camelot.
+ * mode 'note': tónica en dos octavas. mode 'chord': tónica grave + tríada (mayor o menor).
+ * La tónica se sitúa entre Do3 y Si3 (MIDI 48-59), un registro que se oye bien sobre la mezcla.
+ */
+function referenceMidi(code, mode = 'chord') {
+  const k = fromCamelot(code);
+  if (!k) return [];
+  const root = 48 + k.tonic;
+  if (mode === 'note') return [root - 12, root];
+  return [root - 12, root, root + (k.mode === 'major' ? 4 : 3), root + 7];
+}
+
+return { camelotNumber, camelotCode, openKeyCode, musicalName, fromCamelot, formatKey, keyColor, compatibility, compatibleCodes, relativeCode, referenceMidi };
+})();
+
+__mods["dsp"] = (() => {
+// Motor de análisis: tonalidad, BPM, energía, cue points y forma de onda.
+// Sin dependencias; funciona en navegador (Web Worker) y en Node.
+
+const { camelotCode, openKeyCode, musicalName } = __mods["camelot"];
+const ANALYSIS_SAMPLE_RATE = 22050;
+
+// ---------------------------------------------------------------- FFT ----
+
+const fftCache = new Map();
+
+function fftTables(n) {
+  let t = fftCache.get(n);
+  if (t) return t;
+  const levels = Math.round(Math.log2(n));
+  if (1 << levels !== n) throw new Error('El tamaño de la FFT debe ser potencia de 2');
+  const rev = new Uint32Array(n);
+  for (let i = 0; i < n; i++) {
+    let r = 0;
+    let x = i;
+    for (let j = 0; j < levels; j++) {
+      r = (r << 1) | (x & 1);
+      x >>= 1;
+    }
+    rev[i] = r;
+  }
+  const cos = new Float64Array(n / 2);
+  const sin = new Float64Array(n / 2);
+  for (let i = 0; i < n / 2; i++) {
+    cos[i] = Math.cos((2 * Math.PI * i) / n);
+    sin[i] = Math.sin((2 * Math.PI * i) / n);
+  }
+  t = { rev, cos, sin };
+  fftCache.set(n, t);
+  return t;
+}
+
+/** FFT compleja radix-2 in situ (signo negativo). */
+function fft(re, im) {
+  const n = re.length;
+  const { rev, cos, sin } = fftTables(n);
+  for (let i = 0; i < n; i++) {
+    const j = rev[i];
+    if (j > i) {
+      let t = re[i]; re[i] = re[j]; re[j] = t;
+      t = im[i]; im[i] = im[j]; im[j] = t;
+    }
+  }
+  for (let size = 2; size <= n; size <<= 1) {
+    const half = size >> 1;
+    const step = n / size;
+    for (let i = 0; i < n; i += size) {
+      for (let j = i, k = 0; j < i + half; j++, k += step) {
+        const l = j + half;
+        const tre = re[l] * cos[k] + im[l] * sin[k];
+        const tim = im[l] * cos[k] - re[l] * sin[k];
+        re[l] = re[j] - tre;
+        im[l] = im[j] - tim;
+        re[j] += tre;
+        im[j] += tim;
+      }
+    }
+  }
+}
+
+function hann(n) {
+  const w = new Float64Array(n);
+  for (let i = 0; i < n; i++) w[i] = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (n - 1));
+  return w;
+}
+
+const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
+const db = (p) => 10 * Math.log10(p + 1e-12);
+
+function interp(arr, x) {
+  const i = Math.floor(x);
+  if (i < 0 || i + 1 >= arr.length) return 0;
+  const f = x - i;
+  return arr[i] * (1 - f) + arr[i + 1] * f;
+}
+
+// ------------------------------------------------- Características STFT ----
+
+function shortTimeFeatures(x, sr, progress) {
+  const N = 1024;
+  const H = 256;
+  const half = N / 2;
+  const n = Math.max(1, Math.floor((x.length - N) / H) + 1);
+  const win = hann(N);
+  const re = new Float64Array(N);
+  const im = new Float64Array(N);
+  const prev = new Float64Array(half);
+  const odf = new Float32Array(n);
+  const lowOdf = new Float32Array(n);
+  const rms = new Float32Array(n);
+  const low = new Float32Array(n);
+  const mid = new Float32Array(n);
+  const high = new Float32Array(n);
+  const centroid = new Float32Array(n);
+  const binHz = sr / N;
+  const lowEnd = Math.round(200 / binHz);
+  const kickEnd = Math.max(2, Math.round(160 / binHz));
+  const midEnd = Math.round(4000 / binHz);
+
+  for (let f = 0; f < n; f++) {
+    const off = f * H;
+    let sq = 0;
+    for (let i = 0; i < N; i++) {
+      const s = x[off + i] || 0;
+      sq += s * s;
+      re[i] = s * win[i];
+      im[i] = 0;
+    }
+    rms[f] = Math.sqrt(sq / N);
+    fft(re, im);
+    let flux = 0, kflux = 0, lo = 0, mi = 0, hi = 0, num = 0, den = 0;
+    for (let k = 1; k < half; k++) {
+      const p = re[k] * re[k] + im[k] * im[k];
+      const m = Math.sqrt(p);
+      const lm = Math.log1p(100 * m);
+      const d = lm - prev[k];
+      if (d > 0) {
+        flux += d;
+        if (k < kickEnd) kflux += d;
+      }
+      prev[k] = lm;
+      if (k < lowEnd) lo += p;
+      else if (k < midEnd) mi += p;
+      else hi += p;
+      num += k * binHz * m;
+      den += m;
+    }
+    odf[f] = f === 0 ? 0 : flux;
+    lowOdf[f] = f === 0 ? 0 : kflux;
+    low[f] = lo;
+    mid[f] = mi;
+    high[f] = hi;
+    centroid[f] = den > 0 ? num / den : 0;
+    if ((f & 2047) === 0) progress(f / n);
+  }
+  return { odf, lowOdf, rms, low, mid, high, centroid, n, hop: H, frameSize: N, fps: sr / H, sr };
+}
+
+const frameTime = (feat, f) => (f * feat.hop + feat.frameSize / 2) / feat.sr;
+const timeFrame = (feat, t) => (t * feat.sr - feat.frameSize / 2) / feat.hop;
+
+// -------------------------------------------------------------- Tempo ----
+
+const MIN_BPM = 80;
+const MAX_BPM = 180;
+
+function combScore(sm, period, phaseStep = 1) {
+  let best = -Infinity;
+  let bestPhase = 0;
+  const n = sm.length;
+  for (let ph = 0; ph < period; ph += phaseStep) {
+    let s = 0;
+    let c = 0;
+    for (let t = ph; t < n - 1; t += period) {
+      const i = t | 0;
+      const fr = t - i;
+      s += sm[i] * (1 - fr) + sm[i + 1] * fr;
+      c++;
+    }
+    if (c && s / c > best) {
+      best = s / c;
+      bestPhase = ph;
+    }
+  }
+  return { score: best, phase: bestPhase };
+}
+
+/** Resta de la media local (±0,5 s) + rectificación de media onda. */
+function detrend(raw, fps) {
+  const n = raw.length;
+  const prefix = new Float64Array(n + 1);
+  for (let i = 0; i < n; i++) prefix[i + 1] = prefix[i] + raw[i];
+  const w = Math.max(1, Math.round(fps * 0.5));
+  const out = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const a = Math.max(0, i - w);
+    const b = Math.min(n, i + w + 1);
+    const v = raw[i] - (prefix[b] - prefix[a]) / (b - a);
+    out[i] = v > 0 ? v : 0;
+  }
+  return out;
+}
+
+function smooth3(x) {
+  const n = x.length;
+  const out = new Float32Array(n);
+  for (let i = 0; i < n; i++) out[i] = 0.25 * (x[i - 1] || 0) + 0.5 * x[i] + 0.25 * (x[i + 1] || 0);
+  return out;
+}
+
+function mean(x) {
+  let s = 0;
+  for (let i = 0; i < x.length; i++) s += x[i];
+  return s / Math.max(1, x.length);
+}
+
+function estimateTempo(feat) {
+  const fps = feat.fps;
+  const odf = detrend(feat.odf, fps);
+  const n = odf.length;
+
+  // Autocorrelación.
+  const maxLag = Math.min(n - 1, Math.ceil(((fps * 60) / MIN_BPM) * 4) + 2);
+  const ac = new Float32Array(maxLag + 1);
+  for (let lag = 0; lag <= maxLag; lag++) {
+    let s = 0;
+    for (let i = 0; i + lag < n; i++) s += odf[i] * odf[i + lag];
+    ac[lag] = s / (n - lag);
+  }
+  if (ac[0] <= 0) return { bpm: 0, period: 0, phase: 0, confidence: 0, odf };
+  for (let lag = maxLag; lag >= 0; lag--) ac[lag] /= ac[0];
+
+  // Búsqueda gruesa con refuerzo de armónicos del periodo.
+  let coarse = 120;
+  let coarseScore = -Infinity;
+  for (let bpm = MIN_BPM; bpm < MAX_BPM; bpm += 0.25) {
+    const L = (60 * fps) / bpm;
+    const prior = Math.exp(-0.5 * (Math.log2(bpm / 125) / 1.2) ** 2);
+    const s = (interp(ac, L) + 0.5 * interp(ac, 2 * L) + 0.25 * interp(ac, 4 * L)) * (0.85 + 0.15 * prior);
+    if (s > coarseScore) {
+      coarseScore = s;
+      coarse = bpm;
+    }
+  }
+
+  // Error de octava: si el doble de tempo también tiene periodicidad fuerte, se prefiere
+  // (p. ej. drum & bass a 174 en lugar de 87).
+  const Lc = (60 * fps) / coarse;
+  if (coarse * 2 < MAX_BPM && interp(ac, Lc / 2) >= 0.75 * interp(ac, Lc)) coarse *= 2;
+
+  // Refinado con filtro peine sobre toda la pista.
+  const sm = smooth3(smooth3(odf));
+  let bestBpm = coarse;
+  let best = { score: -Infinity, phase: 0 };
+  for (let bpm = coarse - 1; bpm <= coarse + 1; bpm += 0.02) {
+    const r = combScore(sm, (60 * fps) / bpm, 0.5);
+    if (r.score > best.score) {
+      best = r;
+      bestBpm = bpm;
+    }
+  }
+  // Preferir el entero cercano si puntúa casi igual (la mayoría de producciones usan BPM enteros).
+  const rounded = Math.round(bestBpm);
+  if (Math.abs(rounded - bestBpm) < 0.15) {
+    const r = combScore(sm, (60 * fps) / rounded, 0.5);
+    if (r.score >= best.score * 0.97) {
+      best = r;
+      bestBpm = rounded;
+    }
+  }
+  const period = (60 * fps) / bestBpm;
+  const confidence = clamp01((combScore(sm, period, 0.5).score / (mean(sm) + 1e-9) - 1) / 3);
+  // Fase: el bombo (flujo de graves) marca el tiempo mejor que los charles a contratiempo.
+  const kick = smooth3(detrend(feat.lowOdf, fps));
+  const kickFit = combScore(kick, period, 0.25);
+  const phase = kickFit.score / (mean(kick) + 1e-9) > 1.5 ? kickFit.phase : combScore(sm, period, 0.25).phase;
+  return { bpm: Math.round(bestBpm * 100) / 100, period, phase, confidence };
+}
+
+// --------------------------------------------------------- Tonalidad ----
+
+// Perfiles de Krumhansl-Kessler y Temperley (C como tónica).
+const KK_MAJOR = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88];
+const KK_MINOR = [6.33, 2.68, 3.52, 5.38, 2.6, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
+const TP_MAJOR = [0.748, 0.06, 0.488, 0.082, 0.67, 0.46, 0.096, 0.715, 0.104, 0.366, 0.057, 0.4];
+const TP_MINOR = [0.712, 0.084, 0.474, 0.618, 0.049, 0.46, 0.105, 0.747, 0.404, 0.067, 0.133, 0.33];
+
+function pearson(a, b, rot) {
+  let ma = 0, mb = 0;
+  for (let i = 0; i < 12; i++) { ma += a[i]; mb += b[i]; }
+  ma /= 12; mb /= 12;
+  let num = 0, da = 0, dbb = 0;
+  for (let i = 0; i < 12; i++) {
+    const x = a[(i + rot) % 12] - ma;
+    const y = b[i] - mb;
+    num += x * y; da += x * x; dbb += y * y;
+  }
+  return num / Math.sqrt(da * dbb + 1e-12);
+}
+
+function keyFromChroma(chroma) {
+  const scores = [];
+  for (let t = 0; t < 12; t++) {
+    scores.push({ tonic: t, mode: 'major', score: 0.5 * pearson(chroma, KK_MAJOR, t) + 0.5 * pearson(chroma, TP_MAJOR, t) });
+    scores.push({ tonic: t, mode: 'minor', score: 0.5 * pearson(chroma, KK_MINOR, t) + 0.5 * pearson(chroma, TP_MINOR, t) });
+  }
+  scores.sort((a, b) => b.score - a.score);
+  return scores;
+}
+
+function estimateKey(x, sr, progress) {
+  const N = 1 << Math.round(Math.log2(sr / 1.35));
+  const H = N / 2;
+  const binHz = sr / N;
+  const kMin = Math.max(2, Math.ceil(52 / binHz));
+  const kMax = Math.min(N / 2 - 2, Math.floor(1800 / binHz));
+  const win = hann(N);
+  const re = new Float64Array(N);
+  const im = new Float64Array(N);
+  const mag = new Float64Array(N / 2);
+  const nFrames = Math.max(1, Math.floor((x.length - N) / H) + 1);
+  const frames = [];
+  let tc = 0, ts = 0;
+
+  for (let f = 0; f < nFrames; f++) {
+    const off = f * H;
+    let sq = 0;
+    for (let i = 0; i < N; i++) {
+      const s = x[off + i] || 0;
+      sq += s * s;
+      re[i] = s * win[i];
+      im[i] = 0;
+    }
+    if (sq / N < 1e-6) continue; // silencio (< -60 dBFS)
+    fft(re, im);
+    let maxM = 0;
+    for (let k = kMin - 1; k <= kMax + 1; k++) {
+      mag[k] = Math.sqrt(re[k] * re[k] + im[k] * im[k]);
+      if (mag[k] > maxM) maxM = mag[k];
+    }
+    const thr = maxM * 0.02;
+    const peaks = [];
+    for (let k = kMin; k <= kMax; k++) {
+      const b = mag[k];
+      if (b < thr || b <= mag[k - 1] || b < mag[k + 1]) continue;
+      const a = Math.log(mag[k - 1] + 1e-12);
+      const c = Math.log(mag[k + 1] + 1e-12);
+      const lb = Math.log(b);
+      const den = a - 2 * lb + c;
+      const delta = den !== 0 ? (0.5 * (a - c)) / den : 0;
+      const freq = (k + delta) * binHz;
+      const midi = 69 + 12 * Math.log2(freq / 440);
+      const w = Math.sqrt(b);
+      peaks.push(midi, w);
+      const ang = 2 * Math.PI * (midi - Math.round(midi));
+      tc += w * Math.cos(ang);
+      ts += w * Math.sin(ang);
+    }
+    if (peaks.length) frames.push(peaks);
+    if ((f & 31) === 0) progress(f / nFrames);
+  }
+
+  // Desafinación global (en semitonos) respecto a A=440.
+  const tuning = Math.atan2(ts, tc) / (2 * Math.PI);
+  const chroma = new Float64Array(12);
+  const bass = new Float64Array(12);
+  for (const peaks of frames) {
+    const fc = new Float64Array(12);
+    const fb = new Float64Array(12);
+    let sum = 0;
+    for (let i = 0; i < peaks.length; i += 2) {
+      const m = peaks[i] - tuning;
+      const r = Math.round(m);
+      const closeness = Math.cos(Math.PI * (m - r)) ** 2;
+      const w = peaks[i + 1] * closeness;
+      const pc = ((r % 12) + 12) % 12;
+      fc[pc] += w;
+      if (r < 55) fb[pc] += w; // por debajo de G3: línea de bajo
+      sum += w;
+    }
+    if (sum <= 0) continue;
+    for (let i = 0; i < 12; i++) {
+      chroma[i] += fc[i] / sum;
+      bass[i] += fb[i] / sum;
+    }
+  }
+  const total = chroma.reduce((a, b) => a + b, 0);
+  if (total <= 0) return null;
+  // La línea de bajo refuerza la tónica.
+  const combined = new Float64Array(12);
+  for (let i = 0; i < 12; i++) combined[i] = chroma[i] + 0.35 * bass[i];
+  const bassMax = Math.max(...bass) || 1;
+  const ranking = keyFromChroma(combined)
+    .map((r) => ({ ...r, score: r.score + 0.08 * (bass[r.tonic] / bassMax) }))
+    .sort((a, b) => b.score - a.score);
+  const best = ranking[0];
+  const second = ranking[1];
+  const confidence = clamp01((best.score - second.score) / 0.12) * 0.6 + clamp01(best.score) * 0.4;
+  const mx = Math.max(...combined);
+  return {
+    tonic: best.tonic,
+    mode: best.mode,
+    score: best.score,
+    confidence,
+    tuningCents: Math.round(tuning * 100),
+    chroma: Array.from(combined, (v) => v / mx),
+    alternatives: ranking.slice(1, 3).map((r) => camelotCode(r.tonic, r.mode)),
+  };
+}
+
+// ------------------------------------------------------ Rejilla de beats ----
+
+function buildBeatGrid(tempo, feat, duration) {
+  if (!tempo.bpm) return { bpm: 0, beats: [], firstBeat: 0, downbeat: 0, beatLoud: [], beatLow: [] };
+  const beatSec = 60 / tempo.bpm;
+  let first = frameTime(feat, tempo.phase);
+  first -= Math.floor((first + 0.05) / beatSec) * beatSec; // tolera un beat detectado unos ms antes de 0
+  const beats = [];
+  for (let t = first; t + beatSec <= duration; t += beatSec) beats.push(t);
+
+  // Volumen y graves por beat.
+  const beatLoud = [];
+  const beatLow = [];
+  for (let i = 0; i < beats.length; i++) {
+    const a = Math.max(0, Math.round(timeFrame(feat, beats[i])));
+    const b = Math.min(feat.n, Math.round(timeFrame(feat, beats[i] + beatSec)));
+    let p = 0, l = 0, c = 0;
+    for (let f = a; f < b; f++) {
+      p += feat.rms[f] * feat.rms[f];
+      l += feat.low[f];
+      c++;
+    }
+    beatLoud.push(c ? db(p / c) : -120);
+    beatLow.push(c ? db(l / c) : -120);
+  }
+  const maxLoud = Math.max(...beatLoud);
+  const maxLow = Math.max(...beatLow);
+  for (let i = 0; i < beats.length; i++) {
+    beatLoud[i] = Math.max(maxLoud - 60, beatLoud[i]);
+    beatLow[i] = Math.max(-60, beatLow[i] - maxLow);
+  }
+
+  // Primer tiempo de compás: el desplazamiento cuyos límites de compás concentran más cambios.
+  let downbeat = 0;
+  let bestScore = -Infinity;
+  for (let o = 0; o < 4; o++) {
+    let s = 0;
+    let prev = null;
+    for (let i = o; i + 4 <= beats.length; i += 4) {
+      let e = 0;
+      for (let j = 0; j < 4; j++) e += beatLoud[i + j] + beatLow[i + j];
+      e /= 4;
+      if (prev !== null) s += (e - prev) ** 2; // cuadrado: premia cambios nítidos en el límite de compás
+      prev = e;
+    }
+    if (s > bestScore) {
+      bestScore = s;
+      downbeat = o;
+    }
+  }
+  return { bpm: tempo.bpm, beats, firstBeat: first, downbeat, beatLoud, beatLow };
+}
+
+// ------------------------------------------------------------ Energía ----
+
+function estimateEnergy(feat, bpm, duration) {
+  const n = feat.n;
+  const powers = new Float64Array(n);
+  for (let i = 0; i < n; i++) powers[i] = feat.rms[i] * feat.rms[i];
+  const sorted = Float64Array.from(powers).sort();
+  const top = sorted.subarray(Math.floor(n * 0.5));
+  let mp = 0;
+  for (let i = 0; i < top.length; i++) mp += top[i];
+  const loudDb = db(mp / Math.max(1, top.length));
+
+  // Proporción de la pista cerca del nivel máximo (secciones intensas).
+  const thr = Math.pow(10, (loudDb - 6) / 10);
+  let loudFrames = 0;
+  let cSum = 0;
+  for (let i = 0; i < n; i++) {
+    if (powers[i] >= thr) {
+      loudFrames++;
+      cSum += feat.centroid[i];
+    }
+  }
+  const fullness = loudFrames / n;
+  const centroid = loudFrames ? cSum / loudFrames : 0;
+
+  // Densidad de ataques por segundo.
+  const odf = feat.odf;
+  const so = Float32Array.from(odf).sort();
+  const median = so[Math.floor(n / 2)] || 0;
+  const p90 = so[Math.floor(n * 0.9)] || 0;
+  const onsetThr = median + 0.5 * (p90 - median);
+  const minGap = Math.round(feat.fps * 0.08);
+  let onsets = 0;
+  let last = -minGap;
+  for (let i = 1; i < n - 1; i++) {
+    if (odf[i] > onsetThr && odf[i] >= odf[i - 1] && odf[i] >= odf[i + 1] && i - last >= minGap) {
+      onsets++;
+      last = i;
+    }
+  }
+  const density = onsets / Math.max(1, duration);
+
+  return energyFromFeatures({ loudnessDb: loudDb, onsetsPerSec: density, centroidHz: centroid, fullness, bpm });
+}
+
+/**
+ * Nivel de energía 1-10 a partir de las medidas de la pista. Separado del análisis para poder
+ * recalcular pistas ya analizadas cuando cambia la fórmula.
+ *
+ * Calibración: los másteres modernos suenan todos fuertes, así que el volumen pesa poco y lo que
+ * más distingue es el brillo (un deep house es oscuro, un peak-time techno brillante) y el tempo
+ * dentro del rango de baile. La curva final (^1,3) reserva los valores altos para pistas que
+ * puntúan alto en casi todo. Referencia: «Frink - Deeply» (deep house, 124 BPM, energía baja) → 4.
+ */
+function energyFromFeatures({ loudnessDb, onsetsPerSec, centroidHz, fullness, bpm }) {
+  const L = clamp01((loudnessDb + 22) / 16);
+  const D = clamp01((onsetsPerSec - 2) / 7);
+  const C = clamp01((centroidHz - 1200) / 2000);
+  const B = clamp01((bpm - 110) / 40);
+  const F = clamp01(fullness / 0.7);
+  const score = 0.2 * L + 0.15 * D + 0.3 * C + 0.2 * B + 0.15 * F;
+  const level = Math.max(1, Math.min(10, Math.round(1 + 9 * score ** 1.3)));
+  const r2 = (v) => Math.round(v * 100) / 100;
+  return {
+    level,
+    score: r2(score),
+    loudnessDb: Math.round(loudnessDb * 10) / 10,
+    onsetsPerSec: Math.round(onsetsPerSec * 10) / 10,
+    centroidHz: Math.round(centroidHz),
+    fullness: r2(fullness),
+    parts: { L: r2(L), D: r2(D), C: r2(C), B: r2(B), F: r2(F) },
+    weights: { L: 20, D: 15, C: 30, B: 20, F: 15 },
+  };
+}
+
+// --------------------------------------------------------- Cue points ----
+
+function detectCues(grid, duration, maxCues = 8) {
+  const { beats, downbeat, beatLoud, beatLow } = grid;
+  if (!beats.length) return [{ time: 0, label: 'Inicio', kind: 'intro' }];
+  const bars = [];
+  for (let i = downbeat; i + 4 <= beats.length; i += 4) {
+    let e = 0;
+    for (let j = 0; j < 4; j++) e += 0.5 * beatLoud[i + j] + 0.5 * beatLow[i + j];
+    bars.push({ beat: i, time: beats[i], e: e / 4 });
+  }
+  // Primer compás con sonido.
+  const peak = Math.max(...bars.map((b) => b.e), -120);
+  let startBar = bars.findIndex((b) => b.e > peak - 30);
+  if (startBar < 0) startBar = 0;
+  const cues = [{ time: bars.length ? bars[startBar].time : beats[0], label: 'Intro', kind: 'intro', bar: startBar }];
+
+  const W = 8;
+  const cands = [];
+  for (let b = startBar + 2; b < bars.length - 1; b++) {
+    const pa = Math.max(startBar, b - W);
+    const nb = Math.min(bars.length, b + W);
+    if (b - pa < 2 || nb - b < 4) continue;
+    let before = 0, after = 0;
+    for (let i = pa; i < b; i++) before += bars[i].e;
+    for (let i = b; i < nb; i++) after += bars[i].e;
+    const nov = after / (nb - b) - before / (b - pa);
+    const rel = b - startBar;
+    const bonus = rel % 8 === 0 ? 1.3 : rel % 4 === 0 ? 1.12 : 1;
+    cands.push({ b, nov, score: Math.abs(nov) * bonus });
+  }
+  // Solo máximos locales de novedad (±3 compases).
+  const byBar = new Map(cands.map((c) => [c.b, c]));
+  for (const c of cands) {
+    for (let d = -3; d <= 3; d++) {
+      const o = byBar.get(c.b + d);
+      if (d && o && Math.abs(o.nov) > Math.abs(c.nov)) c.score = 0;
+    }
+  }
+  cands.sort((x, y) => y.score - x.score);
+  const chosen = [];
+  for (const c of cands) {
+    if (chosen.length >= maxCues - 1) break;
+    if (Math.abs(c.nov) < 1.5) break;
+    if (Math.abs(c.b - startBar) < 8) continue;
+    if (chosen.some((o) => Math.abs(o.b - c.b) < 8)) continue;
+    chosen.push(c);
+  }
+  chosen.sort((x, y) => x.b - y.b);
+  for (const c of chosen) {
+    const t = bars[c.b].time;
+    let label, kind;
+    if (c.nov > 0) {
+      if (c.nov >= 4) { label = 'Drop'; kind = 'drop'; }
+      else { label = 'Subida'; kind = 'build'; }
+    } else if (t > duration * 0.8) { label = 'Outro'; kind = 'outro'; }
+    else { label = 'Break'; kind = 'break'; }
+    cues.push({ time: t, label, kind, bar: c.b });
+  }
+  return cues.map((c) => ({ ...c, time: Math.max(0, Math.round(c.time * 1000) / 1000) }));
+}
+
+// ----------------------------------------------------- Forma de onda ----
+
+function buildWaveform(x, feat, cols = 1000) {
+  const peaks = new Uint8Array(cols);
+  const low = new Uint8Array(cols);
+  const mid = new Uint8Array(cols);
+  const high = new Uint8Array(cols);
+  const spc = x.length / cols;
+  let gmax = 1e-9;
+  const raw = new Float32Array(cols);
+  for (let c = 0; c < cols; c++) {
+    const a = Math.floor(c * spc);
+    const b = Math.min(x.length, Math.floor((c + 1) * spc));
+    let m = 0;
+    for (let i = a; i < b; i++) {
+      const v = x[i] < 0 ? -x[i] : x[i];
+      if (v > m) m = v;
+    }
+    raw[c] = m;
+    if (m > gmax) gmax = m;
+    const fa = Math.max(0, Math.floor(timeFrame(feat, a / feat.sr)));
+    const fb = Math.min(feat.n, Math.max(fa + 1, Math.ceil(timeFrame(feat, b / feat.sr))));
+    let l = 0, md = 0, h = 0;
+    for (let f = fa; f < fb; f++) { l += feat.low[f]; md += feat.mid[f]; h += feat.high[f]; }
+    l = Math.sqrt(l); md = Math.sqrt(md) * 1.6; h = Math.sqrt(h) * 4;
+    const s = l + md + h || 1;
+    low[c] = Math.round((l / s) * 255);
+    mid[c] = Math.round((md / s) * 255);
+    high[c] = Math.round((h / s) * 255);
+  }
+  for (let c = 0; c < cols; c++) peaks[c] = Math.round((raw[c] / gmax) * 255);
+  return { peaks, low, mid, high };
+}
+
+// ------------------------------------------------------------- API ----
+
+/**
+ * Analiza una señal mono (Float32Array) y devuelve tonalidad, BPM, energía, cues y forma de onda.
+ */
+function analyzeTrack(samples, sampleRate = ANALYSIS_SAMPLE_RATE, onProgress = () => {}) {
+  if (samples.length < sampleRate * 3) throw new Error('El audio es demasiado corto (mínimo 3 segundos).');
+  const duration = samples.length / sampleRate;
+  onProgress(0.01, 'Extrayendo características');
+  const feat = shortTimeFeatures(samples, sampleRate, (p) => onProgress(0.01 + p * 0.39, 'Extrayendo características'));
+  onProgress(0.4, 'Detectando tempo');
+  const tempo = estimateTempo(feat);
+  onProgress(0.5, 'Detectando tonalidad');
+  const key = estimateKey(samples, sampleRate, (p) => onProgress(0.5 + p * 0.4, 'Detectando tonalidad'));
+  onProgress(0.92, 'Calculando energía y cue points');
+  const grid = buildBeatGrid(tempo, feat, duration);
+  const energy = estimateEnergy(feat, tempo.bpm, duration);
+  const cues = detectCues(grid, duration);
+  const waveform = buildWaveform(samples, feat);
+  onProgress(1, 'Listo');
+  return {
+    version: 1,
+    duration,
+    bpm: tempo.bpm,
+    bpmConfidence: Math.round(tempo.confidence * 100) / 100,
+    key: key && {
+      tonic: key.tonic,
+      mode: key.mode,
+      camelot: camelotCode(key.tonic, key.mode),
+      openKey: openKeyCode(key.tonic, key.mode),
+      musical: musicalName(key.tonic, key.mode),
+      confidence: Math.round(key.confidence * 100) / 100,
+      tuningCents: key.tuningCents,
+      chroma: key.chroma.map((v) => Math.round(v * 1000) / 1000),
+      alternatives: key.alternatives,
+    },
+    energy: energy.level,
+    energyDetail: energy,
+    beatGrid: { firstBeat: Math.round(grid.firstBeat * 1000) / 1000, downbeat: grid.downbeat, bpm: grid.bpm },
+    cues,
+    waveform,
+  };
+}
+
+return { ANALYSIS_SAMPLE_RATE, fft, MIN_BPM, MAX_BPM, keyFromChroma, energyFromFeatures, analyzeTrack };
+})();
+
+__mods["id3"] = (() => {
+// Lectura y escritura mínima de etiquetas ID3v2.3/2.4 en MP3 (título, artista, tonalidad, BPM, comentario).
+// Conserva el resto de marcos existentes (portadas, álbum, etc.).
+
+const latin1 = (bytes) => String.fromCharCode(...bytes);
+
+function syncsafe(b, o) {
+  return ((b[o] & 0x7f) << 21) | ((b[o + 1] & 0x7f) << 14) | ((b[o + 2] & 0x7f) << 7) | (b[o + 3] & 0x7f);
+}
+
+function u32(b, o) {
+  return ((b[o] << 24) >>> 0) + (b[o + 1] << 16) + (b[o + 2] << 8) + b[o + 3];
+}
+
+function parseHeader(bytes) {
+  if (bytes.length < 10 || latin1(bytes.subarray(0, 3)) !== 'ID3') return null;
+  const major = bytes[3];
+  const flags = bytes[5];
+  const size = syncsafe(bytes, 6);
+  const footer = major === 4 && flags & 0x10 ? 10 : 0;
+  return { major, flags, size, total: 10 + size + footer };
+}
+
+function parseFrames(bytes, header) {
+  const frames = [];
+  if (header.major < 3) return frames; // ID3v2.2 no soportado
+  let off = 10;
+  const end = Math.min(bytes.length, 10 + header.size);
+  if (header.flags & 0x40) {
+    const extSize = header.major === 4 ? syncsafe(bytes, off) : u32(bytes, off) + 4;
+    off += extSize;
+  }
+  while (off + 10 <= end) {
+    if (bytes[off] === 0) break; // relleno
+    const id = latin1(bytes.subarray(off, off + 4));
+    if (!/^[A-Z0-9]{4}$/.test(id)) break;
+    const size = header.major === 4 ? syncsafe(bytes, off + 4) : u32(bytes, off + 4);
+    if (size < 0 || off + 10 + size > end) break;
+    frames.push({ id, flags: bytes.subarray(off + 8, off + 10), body: bytes.subarray(off + 10, off + 10 + size) });
+    off += 10 + size;
+  }
+  return frames;
+}
+
+function decodeText(enc, bytes) {
+  // Quita terminadores nulos.
+  let end = bytes.length;
+  if (enc === 1 || enc === 2) {
+    while (end >= 2 && bytes[end - 1] === 0 && bytes[end - 2] === 0) end -= 2;
+  } else {
+    while (end > 0 && bytes[end - 1] === 0) end--;
+  }
+  const b = bytes.subarray(0, end);
+  if (enc === 0) return latin1(b);
+  if (enc === 3) return new TextDecoder('utf-8').decode(b);
+  if (enc === 2) return new TextDecoder('utf-16be').decode(b);
+  // UTF-16 con BOM
+  if (b[0] === 0xfe && b[1] === 0xff) return new TextDecoder('utf-16be').decode(b.subarray(2));
+  if (b[0] === 0xff && b[1] === 0xfe) return new TextDecoder('utf-16le').decode(b.subarray(2));
+  return new TextDecoder('utf-16le').decode(b);
+}
+
+function textFrame(body) {
+  return decodeText(body[0], body.subarray(1)).split('\u0000')[0];
+}
+
+function commentFrame(body, skip = 4) {
+  const enc = body[0];
+  const rest = body.subarray(skip);
+  const wide = enc === 1 || enc === 2;
+  let i = 0;
+  if (wide) {
+    while (i + 1 < rest.length && !(rest[i] === 0 && rest[i + 1] === 0)) i += 2;
+    return { description: decodeText(enc, rest.subarray(0, i)), text: decodeText(enc, rest.subarray(i + 2)) };
+  }
+  while (i < rest.length && rest[i] !== 0) i++;
+  return { description: decodeText(enc, rest.subarray(0, i)), text: decodeText(enc, rest.subarray(i + 1)) };
+}
+
+/** Lee título, artista, tonalidad, BPM y comentario. Devuelve {} si no hay etiqueta. */
+function readTags(arrayBuffer) {
+  const bytes = new Uint8Array(arrayBuffer);
+  const header = parseHeader(bytes);
+  if (!header || header.flags & 0x80) return {};
+  const out = {};
+  for (const f of parseFrames(bytes, header)) {
+    try {
+      if (f.id === 'TIT2') out.title = textFrame(f.body);
+      else if (f.id === 'TPE1') out.artist = textFrame(f.body);
+      else if (f.id === 'TKEY') out.key = textFrame(f.body);
+      else if (f.id === 'TBPM') out.bpm = textFrame(f.body);
+      else if (f.id === 'COMM' && out.comment === undefined) {
+        const c = commentFrame(f.body);
+        if (!c.description) out.comment = c.text;
+      }
+    } catch {
+      // marco corrupto: se ignora
+    }
+  }
+  return out;
+}
+
+// ------------------------------------------------------------- Escritura ----
+
+function encodeSize(n, major) {
+  if (major === 4) return [(n >> 21) & 0x7f, (n >> 14) & 0x7f, (n >> 7) & 0x7f, n & 0x7f];
+  return [(n >>> 24) & 0xff, (n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff];
+}
+
+function encodeString(str, major) {
+  // Latin-1 si es posible; si no, UTF-8 (v2.4) o UTF-16 con BOM (v2.3).
+  if (/^[\x00-\xff]*$/.test(str)) return { enc: 0, bytes: Uint8Array.from(str, (c) => c.charCodeAt(0)), nul: [0] };
+  if (major === 4) return { enc: 3, bytes: new TextEncoder().encode(str), nul: [0] };
+  const out = new Uint8Array(2 + str.length * 2);
+  out[0] = 0xff;
+  out[1] = 0xfe;
+  for (let i = 0; i < str.length; i++) {
+    const c = str.charCodeAt(i);
+    out[2 + i * 2] = c & 0xff;
+    out[3 + i * 2] = c >> 8;
+  }
+  return { enc: 1, bytes: out, nul: [0, 0] };
+}
+
+function buildFrame(id, body, major, flags = [0, 0]) {
+  const out = new Uint8Array(10 + body.length);
+  out.set(Array.from(id, (c) => c.charCodeAt(0)), 0);
+  out.set(encodeSize(body.length, major), 4);
+  out.set(flags, 8);
+  out.set(body, 10);
+  return out;
+}
+
+function buildTextFrame(id, value, major) {
+  const s = encodeString(value, major);
+  const body = new Uint8Array(1 + s.bytes.length);
+  body[0] = s.enc;
+  body.set(s.bytes, 1);
+  return buildFrame(id, body, major);
+}
+
+function buildCommentFrame(text, major) {
+  const s = encodeString(text, major);
+  // Descripción vacía: con UTF-16 debe llevar BOM propio antes del terminador.
+  const desc = s.enc === 1 ? [0xff, 0xfe, 0, 0] : s.nul;
+  const body = new Uint8Array(1 + 3 + desc.length + s.bytes.length);
+  body[0] = s.enc;
+  body.set([0x65, 0x6e, 0x67], 1); // "eng"
+  body.set(desc, 4);
+  body.set(s.bytes, 4 + desc.length);
+  return buildFrame('COMM', body, major);
+}
+
+/**
+ * Construye una etiqueta ID3 completa (cabecera + marcos + relleno) a partir de una etiqueta
+ * existente (o ninguna), reemplazando solo los campos presentes en values.
+ */
+function buildTag(tagBytes, values, padding = 1024) {
+  const header = tagBytes ? parseHeader(tagBytes) : null;
+  if (header && header.flags & 0x80) throw new Error('Etiqueta ID3 con «unsynchronisation»: no soportada.');
+  if (header && header.major < 3) throw new Error('ID3v2.2 no soportado.');
+  const major = header ? header.major : 3;
+  const keep = header ? parseFrames(tagBytes, header) : [];
+  const replace = new Set();
+  if (values.key != null) replace.add('TKEY');
+  if (values.bpm != null) replace.add('TBPM');
+
+  const parts = [];
+  for (const f of keep) {
+    if (replace.has(f.id)) continue;
+    if (f.id === 'COMM' && values.comment != null) {
+      try {
+        if (!commentFrame(f.body).description) continue;
+      } catch {
+        continue;
+      }
+    }
+    // Algunos programas (p. ej. ffmpeg) guardan el comentario como TXXX:comment.
+    if (f.id === 'TXXX' && values.comment != null) {
+      try {
+        if (commentFrame(f.body, 1).description.toLowerCase() === 'comment') continue;
+      } catch {
+        // se conserva
+      }
+    }
+    parts.push(buildFrame(f.id, f.body, major, f.flags));
+  }
+  if (values.key != null) parts.push(buildTextFrame('TKEY', String(values.key), major));
+  if (values.bpm != null) parts.push(buildTextFrame('TBPM', String(values.bpm), major));
+  if (values.comment != null) parts.push(buildCommentFrame(String(values.comment), major));
+
+  const framesLen = parts.reduce((a, p) => a + p.length, 0);
+  const out = new Uint8Array(10 + framesLen + padding);
+  out.set([0x49, 0x44, 0x33, major, 0, 0], 0);
+  out.set(encodeSize(framesLen + padding, 4), 6); // el tamaño de cabecera siempre es syncsafe
+  let off = 10;
+  for (const p of parts) {
+    out.set(p, off);
+    off += p.length;
+  }
+  return out;
+}
+
+/**
+ * MP3: escribe/reemplaza marcos y devuelve un Blob con el archivo resultante.
+ * values: { key?, bpm?, comment? } — solo se tocan los campos presentes.
+ */
+function writeTags(arrayBuffer, values) {
+  const bytes = new Uint8Array(arrayBuffer);
+  const header = parseHeader(bytes);
+  const tag = buildTag(header ? bytes.subarray(0, header.total) : null, values);
+  const audio = bytes.subarray(header ? header.total : 0);
+  return new Blob([tag, audio], { type: 'audio/mpeg' });
+}
+
+// ------------------------------------------------- AIFF y WAV (sin pérdida) ----
+// Ambos formatos guardan la etiqueta ID3 en un bloque propio («ID3 » en AIFF, «id3 » en WAV),
+// que es donde la leen Rekordbox, Serato, Traktor o Mixed In Key. El audio se copia byte a byte.
+
+const tag4 = (b, o) => String.fromCharCode(b[o], b[o + 1], b[o + 2], b[o + 3]);
+
+function containerInfo(bytes) {
+  if (bytes.length < 12) return null;
+  const id = tag4(bytes, 0);
+  const form = tag4(bytes, 8);
+  if (id === 'FORM' && (form === 'AIFF' || form === 'AIFC')) return { kind: 'aiff', le: false, mime: 'audio/aiff' };
+  if (id === 'RIFF' && form === 'WAVE') return { kind: 'wav', le: true, mime: 'audio/wav' };
+  if (id === 'RF64' || id === 'BW64') throw new Error('WAV de más de 4 GB (RF64): no soportado.');
+  return null;
+}
+
+function chunks(bytes, info) {
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const end = Math.min(bytes.length, 8 + dv.getUint32(4, info.le));
+  const list = [];
+  let off = 12;
+  while (off + 8 <= end) {
+    const size = dv.getUint32(off + 4, info.le);
+    const next = Math.min(end, off + 8 + size + (size & 1));
+    list.push({ id: tag4(bytes, off), start: off, body: off + 8, size, end: next });
+    off = next;
+  }
+  return list;
+}
+
+const isId3Chunk = (id) => id === 'ID3 ' || id === 'id3 ';
+
+/** ¿El archivo es un AIFF o WAV cuyas etiquetas se pueden escribir? */
+function isTaggableContainer(arrayBuffer) {
+  try {
+    return !!containerInfo(new Uint8Array(arrayBuffer));
+  } catch {
+    return false;
+  }
+}
+
+/** Lee título, artista, etc. del bloque ID3 de un AIFF o WAV. */
+function readContainerTags(arrayBuffer) {
+  const bytes = new Uint8Array(arrayBuffer);
+  let info;
+  try {
+    info = containerInfo(bytes);
+  } catch {
+    return {};
+  }
+  if (!info) return {};
+  const c = chunks(bytes, info).find((x) => isId3Chunk(x.id));
+  if (!c) return {};
+  return readTags(bytes.slice(c.body, Math.min(bytes.length, c.body + c.size)).buffer);
+}
+
+/**
+ * AIFF/WAV: reemplaza (o añade al final) el bloque ID3 y devuelve un Blob con el archivo.
+ * Los bloques de audio y el resto de metadatos se conservan sin cambios.
+ */
+function writeContainerTags(arrayBuffer, values) {
+  const bytes = new Uint8Array(arrayBuffer);
+  const info = containerInfo(bytes);
+  if (!info) throw new Error('No es un archivo AIFF ni WAV.');
+  const list = chunks(bytes, info);
+  const old = list.find((x) => isId3Chunk(x.id));
+  let tag = buildTag(old ? bytes.subarray(old.body, old.body + old.size) : null, values);
+  if (tag.length & 1) tag = Uint8Array.from([...tag, 0]); // los bloques deben tener tamaño par
+
+  const chunkHead = new Uint8Array(8);
+  const id = info.kind === 'aiff' ? 'ID3 ' : 'id3 ';
+  for (let i = 0; i < 4; i++) chunkHead[i] = id.charCodeAt(i);
+  new DataView(chunkHead.buffer).setUint32(4, tag.length, info.le);
+
+  const parts = [];
+  for (const c of list) {
+    if (c === old) continue;
+    parts.push(bytes.subarray(c.start, c.end));
+  }
+  // Mismo sitio que el bloque antiguo si existía; si no, al final.
+  const idx = old ? list.indexOf(old) : parts.length;
+  parts.splice(idx, 0, chunkHead, tag);
+
+  const total = 12 + parts.reduce((a, p) => a + p.length, 0);
+  if (total - 8 > 0xffffffff) throw new Error('El archivo resultante superaría los 4 GB.');
+  const head = bytes.slice(0, 12);
+  new DataView(head.buffer).setUint32(4, total - 8, info.le);
+  return new Blob([head, ...parts], { type: info.mime });
+}
+
+return { readTags, writeTags, isTaggableContainer, readContainerTags, writeContainerTags };
+})();
+
+__mods["aiff"] = (() => {
+// Lector de AIFF / AIFF-C (PCM y coma flotante) y codificador WAV de 16 bits.
+// Chrome, Edge y Firefox no decodifican AIFF con Web Audio, así que se hace aquí.
+
+const fourcc = (dv, o) => String.fromCharCode(dv.getUint8(o), dv.getUint8(o + 1), dv.getUint8(o + 2), dv.getUint8(o + 3));
+
+/** Float IEEE 754 extendido de 80 bits (big-endian), usado para la frecuencia de muestreo. */
+function readExtended(dv, o) {
+  const expon = dv.getUint16(o) & 0x7fff;
+  const sign = dv.getUint16(o) & 0x8000 ? -1 : 1;
+  const hi = dv.getUint32(o + 2);
+  const lo = dv.getUint32(o + 6);
+  if (expon === 0 && hi === 0 && lo === 0) return 0;
+  return sign * (hi * 2 ** (expon - 16383 - 31) + lo * 2 ** (expon - 16383 - 63));
+}
+
+function isAiff(arrayBuffer) {
+  if (arrayBuffer.byteLength < 12) return false;
+  const dv = new DataView(arrayBuffer);
+  return fourcc(dv, 0) === 'FORM' && /^AIF[FC]$/.test(fourcc(dv, 8));
+}
+
+/**
+ * Decodifica un AIFF/AIFC. Devuelve { sampleRate, channels: Float32Array[], id3: Uint8Array|null }.
+ */
+function parseAiff(arrayBuffer) {
+  if (!isAiff(arrayBuffer)) throw new Error('No es un archivo AIFF');
+  const dv = new DataView(arrayBuffer);
+  const isAifc = fourcc(dv, 8) === 'AIFC';
+  let comm = null;
+  let ssnd = null;
+  let id3 = null;
+  let off = 12;
+  const end = Math.min(dv.byteLength, 8 + dv.getUint32(4));
+  while (off + 8 <= end) {
+    const id = fourcc(dv, off);
+    const size = dv.getUint32(off + 4);
+    const body = off + 8;
+    if (id === 'COMM') {
+      comm = {
+        channels: dv.getUint16(body),
+        frames: dv.getUint32(body + 2),
+        bits: dv.getUint16(body + 6),
+        sampleRate: readExtended(dv, body + 8),
+        compression: isAifc && size >= 22 ? fourcc(dv, body + 18) : 'NONE',
+      };
+    } else if (id === 'SSND') {
+      const dataOffset = dv.getUint32(body);
+      ssnd = { start: body + 8 + dataOffset, end: Math.min(dv.byteLength, body + size) };
+    } else if (id === 'ID3 ' || id === 'id3 ') {
+      id3 = new Uint8Array(arrayBuffer, body, Math.min(size, dv.byteLength - body));
+    }
+    off = body + size + (size & 1);
+  }
+  if (!comm || !ssnd) throw new Error('AIFF incompleto (faltan los bloques COMM o SSND)');
+
+  const { channels: nch, bits, compression } = comm;
+  let read;
+  let bytes;
+  const comp = compression.toLowerCase();
+  if (comp === 'none' || comp === 'twos' || comp === 'sowt') {
+    const le = comp === 'sowt';
+    bytes = Math.ceil(bits / 8);
+    if (bytes === 1) read = (p) => dv.getInt8(p) / 128;
+    else if (bytes === 2) read = (p) => dv.getInt16(p, le) / 32768;
+    else if (bytes === 3) {
+      read = le
+        ? (p) => ((dv.getUint8(p) | (dv.getUint8(p + 1) << 8) | (dv.getInt8(p + 2) << 16))) / 8388608
+        : (p) => (((dv.getInt8(p) << 16) | (dv.getUint8(p + 1) << 8) | dv.getUint8(p + 2))) / 8388608;
+    } else if (bytes === 4) read = (p) => dv.getInt32(p, le) / 2147483648;
+    else throw new Error(`AIFF de ${bits} bits no soportado`);
+  } else if (comp === 'fl32') {
+    bytes = 4;
+    read = (p) => dv.getFloat32(p);
+  } else if (comp === 'fl64') {
+    bytes = 8;
+    read = (p) => dv.getFloat64(p);
+  } else {
+    throw new Error(`AIFF-C con compresión «${compression}» no soportado`);
+  }
+
+  const frameBytes = bytes * nch;
+  const frames = Math.min(comm.frames, Math.floor((ssnd.end - ssnd.start) / frameBytes));
+  const channels = Array.from({ length: nch }, () => new Float32Array(frames));
+  for (let i = 0, p = ssnd.start; i < frames; i++) {
+    for (let c = 0; c < nch; c++, p += bytes) channels[c][i] = read(p);
+  }
+  return { sampleRate: comm.sampleRate, channels, id3 };
+}
+
+/** Codifica canales en un WAV PCM de 16 bits (para reproducir en navegadores sin soporte AIFF). */
+function encodeWav(channels, sampleRate, type = 'audio/wav') {
+  const nch = channels.length;
+  const n = channels[0]?.length || 0;
+  const buf = new ArrayBuffer(44 + n * nch * 2);
+  const dv = new DataView(buf);
+  const str = (o, s) => { for (let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
+  str(0, 'RIFF'); dv.setUint32(4, 36 + n * nch * 2, true); str(8, 'WAVEfmt ');
+  dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, nch, true);
+  dv.setUint32(24, Math.round(sampleRate), true); dv.setUint32(28, Math.round(sampleRate) * nch * 2, true);
+  dv.setUint16(32, nch * 2, true); dv.setUint16(34, 16, true);
+  str(36, 'data'); dv.setUint32(40, n * nch * 2, true);
+  let p = 44;
+  for (let i = 0; i < n; i++) {
+    for (let c = 0; c < nch; c++, p += 2) {
+      const s = Math.max(-1, Math.min(1, channels[c][i]));
+      dv.setInt16(p, s < 0 ? s * 32768 : s * 32767, true);
+    }
+  }
+  return new Blob([buf], { type });
+}
+
+return { isAiff, parseAiff, encodeWav };
+})();
+
+__mods["setbuilder"] = (() => {
+// Ordenación armónica de sets: minimiza choques de tonalidad, saltos de BPM y caídas de energía.
+
+const { compatibility } = __mods["camelot"];
+/** Diferencia de tempo en % teniendo en cuenta mezclas a doble/mitad de tempo. */
+function bpmDistance(a, b) {
+  if (!a || !b) return 100;
+  return Math.min(...[b, b * 2, b / 2].map((x) => Math.abs(x - a) / a)) * 100;
+}
+
+/** Coste de pasar de la pista a a la b. Ambas: { camelot, bpm, energy }. */
+function transitionCost(a, b) {
+  const key = compatibility(a.camelot, b.camelot);
+  const bpm = bpmDistance(a.bpm, b.bpm);
+  const de = b.energy - a.energy;
+  const energy = de < 0 ? -de * 0.8 : de > 2 ? (de - 2) * 0.5 : 0;
+  return key.cost + Math.max(0, bpm - 1.5) * 0.6 + energy;
+}
+
+function describeTransition(a, b) {
+  const key = compatibility(a.camelot, b.camelot);
+  return {
+    type: key.type,
+    label: key.label,
+    bpmDelta: Math.round(bpmDistance(a.bpm, b.bpm) * 10) / 10,
+    energyDelta: b.energy - a.energy,
+    cost: transitionCost(a, b),
+  };
+}
+
+const pathCost = (order) => {
+  let c = 0;
+  for (let i = 1; i < order.length; i++) c += transitionCost(order[i - 1], order[i]);
+  return c;
+};
+
+/**
+ * Devuelve las pistas en orden. Vecino más cercano desde la pista inicial
+ * (por defecto la de menor energía) y mejora local 2-opt.
+ */
+function buildSet(tracks, startId = null) {
+  if (tracks.length < 3) return [...tracks].sort((a, b) => a.energy - b.energy);
+  const pool = [...tracks];
+  let start = pool.find((t) => t.id === startId);
+  if (!start) start = pool.reduce((m, t) => (t.energy < m.energy || (t.energy === m.energy && t.bpm < m.bpm) ? t : m));
+  const order = [start];
+  pool.splice(pool.indexOf(start), 1);
+  while (pool.length) {
+    const last = order[order.length - 1];
+    let bi = 0;
+    let bc = Infinity;
+    pool.forEach((t, i) => {
+      const c = transitionCost(last, t);
+      if (c < bc) { bc = c; bi = i; }
+    });
+    order.push(pool.splice(bi, 1)[0]);
+  }
+  if (order.length > 150) return order;
+  let best = pathCost(order);
+  let improved = true;
+  let rounds = 0;
+  while (improved && rounds++ < 20) {
+    improved = false;
+    for (let i = 1; i < order.length - 1; i++) {
+      for (let j = i + 1; j < order.length; j++) {
+        const cand = [...order.slice(0, i), ...order.slice(i, j + 1).reverse(), ...order.slice(j + 1)];
+        const c = pathCost(cand);
+        if (c < best - 1e-9) {
+          order.splice(0, order.length, ...cand);
+          best = c;
+          improved = true;
+        }
+      }
+    }
+  }
+  return order;
+}
+
+
+return { bpmDistance, transitionCost, describeTransition, buildSet, pathCost };
+})();
+
+__mods["synth"] = (() => {
+// Generador de pistas sintéticas para los tests: bombo a tempo fijo + acordes de una tonalidad.
+
+const NOTE = { C: 0, 'C#': 1, D: 2, Eb: 3, E: 4, F: 5, 'F#': 6, G: 7, Ab: 8, A: 9, Bb: 10, B: 11 };
+const freq = (midi) => 440 * 2 ** ((midi - 69) / 12);
+
+/**
+ * chords: lista de arrays de notas MIDI que se alternan cada compás.
+ * sections: opcional, [{ fromBar, toBar, gain, kick }] para crear breaks.
+ */
+function synthTrack({ bpm, chords, bass, seconds = 40, sr = 22050, sections = [] }) {
+  const n = Math.floor(seconds * sr);
+  const out = new Float32Array(n);
+  const beat = 60 / bpm;
+  const bar = beat * 4;
+  const sectionAt = (t) => sections.find((s) => t >= s.fromBar * bar && t < s.toBar * bar) || { gain: 1, kick: true };
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    const sec = sectionAt(t);
+    const barIdx = Math.floor(t / bar);
+    const chord = chords[barIdx % chords.length];
+    let s = 0;
+    for (const m of chord) {
+      const f = freq(m);
+      s += 0.08 * (Math.sin(2 * Math.PI * f * t) + 0.4 * Math.sin(4 * Math.PI * f * t) + 0.2 * Math.sin(6 * Math.PI * f * t));
+    }
+    if (bass != null) {
+      const bm = Array.isArray(bass) ? bass[barIdx % bass.length] : bass;
+      s += 0.15 * Math.sin(2 * Math.PI * freq(bm) * t);
+    }
+    if (sec.kick) {
+      const tb = t % beat;
+      const env = Math.exp(-tb * 30);
+      s += 0.6 * env * Math.sin(2 * Math.PI * (50 + 100 * Math.exp(-tb * 40)) * tb);
+      const th = (t + beat / 2) % beat; // charles a contratiempo
+      s += 0.05 * Math.exp(-th * 80) * (Math.sin(t * 52000) * Math.sin(t * 31337));
+    }
+    out[i] = s * sec.gain;
+  }
+  return out;
+}
+
+
+return { synthTrack, NOTE };
+})();
+
+__mods["demo"] = (() => {
+// Pistas de demostración generadas en el navegador (sin descargar nada).
+const { synthTrack } = __mods["synth"];
+const minor = (r) => [r, r + 3, r + 7];
+const major = (r) => [r, r + 4, r + 7];
+
+const DEMOS = [
+  { title: 'Midnight Signal', key: 'Am', bpm: 126, chords: [minor(57), minor(62), major(52), minor(57)], bass: [45, 50, 40, 45], gain: 0.9 },
+  { title: 'Glass Horizon', key: 'Em', bpm: 128, chords: [minor(52), minor(57), major(59), minor(52)], bass: [40, 45, 47, 40], gain: 1 },
+  { title: 'Daylight Loop', key: 'C', bpm: 124, chords: [major(60), major(65), major(67), major(60)], bass: [36, 41, 43, 36], gain: 0.6 },
+  { title: 'Tidal Drift', key: 'F#m', bpm: 124, chords: [minor(54), minor(59), major(61), minor(54)], bass: [42, 47, 37, 42], gain: 0.8 },
+  { title: 'Velocity Run', key: 'D', bpm: 174, chords: [major(62), major(67), major(69), major(62)], bass: [38, 43, 45, 38], gain: 1 },
+];
+
+function wavFile(samples, sr, name) {
+  const n = samples.length;
+  const buf = new ArrayBuffer(44 + n * 2);
+  const dv = new DataView(buf);
+  const str = (o, s) => [...s].forEach((c, i) => dv.setUint8(o + i, c.charCodeAt(0)));
+  str(0, 'RIFF'); dv.setUint32(4, 36 + n * 2, true); str(8, 'WAVEfmt ');
+  dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+  dv.setUint32(24, sr, true); dv.setUint32(28, sr * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+  str(36, 'data'); dv.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) dv.setInt16(44 + i * 2, Math.max(-32767, Math.min(32767, Math.round(samples[i] * 20000))), true);
+  return new File([buf], name, { type: 'audio/wav', lastModified: 1 });
+}
+
+/** Crea 5 pistas WAV de ~1 minuto con estructura intro / drop / break / drop. */
+function makeDemoFiles() {
+  const sr = 22050;
+  return DEMOS.map((d) => {
+    const bar = (60 / d.bpm) * 4;
+    const x = synthTrack({
+      bpm: d.bpm, sr, seconds: bar * 40, chords: d.chords, bass: d.bass,
+      sections: [
+        { fromBar: 0, toBar: 8, gain: 0.4 * d.gain, kick: true },
+        { fromBar: 8, toBar: 24, gain: d.gain, kick: true },
+        { fromBar: 24, toBar: 32, gain: 0.3 * d.gain, kick: false },
+        { fromBar: 32, toBar: 40, gain: d.gain, kick: true },
+      ],
+    });
+    return wavFile(x, sr, `Demo - ${d.title}.wav`);
+  });
+}
+
+return { makeDemoFiles };
+})();
+
+__mods["rekordbox"] = (() => {
+// Exportación a rekordbox XML (formato DJ_PLAYLISTS de Pioneer DJ / AlphaTheta).
+// Rekordbox no lee cue points de las etiquetas de los archivos: los importa desde este XML.
+
+const esc = (v) => String(v ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  // Caracteres de control no válidos en XML 1.0.
+  .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '');
+
+const KINDS = { mp3: 'MP3 File', wav: 'WAV File', wave: 'WAV File', aif: 'AIFF File', aiff: 'AIFF File', aifc: 'AIFF File', flac: 'FLAC File', m4a: 'M4A File', mp4: 'M4A File', aac: 'AAC File', ogg: 'OGG File' };
+
+function kindOf(name) {
+  const ext = (/\.([^.]+)$/.exec(name)?.[1] || '').toLowerCase();
+  return KINDS[ext] || `${ext.toUpperCase()} File`;
+}
+
+/**
+ * Ruta del archivo en el formato Location de rekordbox:
+ * «F:\Música\Mis temas» + «sub/Tema 1.aiff» → «file://localhost/F:/M%C3%BAsica/Mis%20temas/sub/Tema%201.aiff».
+ * En Mac/Linux («/Users/yo/Music») queda «file://localhost/Users/yo/Music/...».
+ */
+function locationUrl(basePath, relPath) {
+  const parts = `${basePath}/${relPath}`.replace(/\\/g, '/').split('/').filter(Boolean);
+  const enc = parts.map((p, i) => (i === 0 && /^[A-Za-z]:$/.test(p) ? p.toUpperCase() : encodeURIComponent(p)));
+  return `file://localhost/${enc.join('/')}`;
+}
+
+const hexToRgb = (hex) => {
+  const n = parseInt(hex.replace('#', ''), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+};
+
+const f3 = (n) => (Math.round(n * 1000) / 1000).toFixed(3);
+
+/** Primer tiempo fuerte (tiempo 1 del compás) de la rejilla, siempre ≥ 0. */
+function firstDownbeat(grid) {
+  if (!grid?.bpm) return null;
+  const beat = 60 / grid.bpm;
+  let t = grid.firstBeat + (grid.downbeat || 0) * beat;
+  if (t < 0 && t > -0.05) return 0; // detectado unos ms antes del inicio del audio
+  while (t < 0) t += beat * 4;
+  while (t - beat * 4 >= 0) t -= beat * 4;
+  return t;
+}
+
+/**
+ * tracks: [{ title, artist, name, relPath?, size, keyText, comment, result }]
+ * opts: { basePath, useSubfolders, cueColors, playlists: [{ name, ids: [índices en tracks] }],
+ *         beatgrid: true|false, memoryCues: true|false }
+ */
+function buildRekordboxXml(tracks, opts) {
+  const { basePath, useSubfolders = true, cueColors = [], playlists = [], beatgrid = true, memoryCues = true } = opts;
+  const lines = [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<DJ_PLAYLISTS Version="1.0.0">',
+    '  <PRODUCT Name="KeyMix Pro" Version="1.0" Company="KeyMix"/>',
+    `  <COLLECTION Entries="${tracks.length}">`,
+  ];
+  tracks.forEach((t, i) => {
+    const r = t.result;
+    const rel = useSubfolders && t.relPath ? t.relPath : t.name;
+    const attrs = {
+      TrackID: i + 1,
+      Name: t.title,
+      Artist: t.artist || '',
+      Kind: kindOf(t.name),
+      Size: t.size || 0,
+      TotalTime: Math.round(r.duration),
+      AverageBpm: r.bpm ? r.bpm.toFixed(2) : '0.00',
+      Tonality: t.keyText || '',
+      Comments: t.comment || '',
+      Location: locationUrl(basePath, rel),
+    };
+    lines.push(`    <TRACK ${Object.entries(attrs).map(([k, v]) => `${k}="${esc(v)}"`).join(' ')}>`);
+    const down = beatgrid ? firstDownbeat(r.beatGrid) : null;
+    if (down != null) {
+      lines.push(`      <TEMPO Inizio="${f3(down)}" Bpm="${r.bpm.toFixed(2)}" Metro="4/4" Battito="1"/>`);
+    }
+    (r.cues || []).slice(0, 8).forEach((c, n) => {
+      const [R, G, B] = hexToRgb(cueColors[n] || '#28e214');
+      const start = f3(Math.max(0, c.time));
+      // Hot cue (A–H) y, además, un memory cue en el mismo punto.
+      lines.push(`      <POSITION_MARK Name="${esc(c.label)}" Type="0" Start="${start}" Num="${n}" Red="${R}" Green="${G}" Blue="${B}"/>`);
+      if (memoryCues) lines.push(`      <POSITION_MARK Name="${esc(c.label)}" Type="0" Start="${start}" Num="-1"/>`);
+    });
+    lines.push('    </TRACK>');
+  });
+  lines.push('  </COLLECTION>');
+  lines.push(`  <PLAYLISTS>`);
+  lines.push(`    <NODE Type="0" Name="ROOT" Count="${playlists.length}">`);
+  for (const p of playlists) {
+    lines.push(`      <NODE Name="${esc(p.name)}" Type="1" KeyType="0" Entries="${p.ids.length}">`);
+    for (const idx of p.ids) lines.push(`        <TRACK Key="${idx + 1}"/>`);
+    lines.push('      </NODE>');
+  }
+  lines.push('    </NODE>');
+  lines.push('  </PLAYLISTS>');
+  lines.push('</DJ_PLAYLISTS>');
+  return lines.join('\n') + '\n';
+}
+
+return { kindOf, locationUrl, firstDownbeat, buildRekordboxXml };
+})();
+
+__mods["app"] = (() => {
+const { ANALYSIS_SAMPLE_RATE, energyFromFeatures } = __mods["dsp"];
+const { formatKey, keyColor, compatibility, fromCamelot, relativeCode, referenceMidi } = __mods["camelot"];
+const { readTags, writeTags, writeContainerTags, readContainerTags } = __mods["id3"];
+const { isAiff, parseAiff, encodeWav } = __mods["aiff"];
+const { makeDemoFiles } = __mods["demo"];
+const { buildRekordboxXml } = __mods["rekordbox"];
+const { buildSet, describeTransition, transitionCost, bpmDistance, pathCost } = __mods["setbuilder"];
+// ------------------------------------------------------------- Estado ----
+
+const STORAGE_KEY = 'keymix.library.v1';
+const SETTINGS_KEY = 'keymix.settings.v1';
+const TAGGABLE_EXT = /\.(mp3|wav|wave|aif|aiff|aifc)$/i;
+const isTaggable = (name) => TAGGABLE_EXT.test(name);
+const AUDIO_EXT = /\.(mp3|wav|wave|flac|m4a|mp4|aac|ogg|oga|opus|aif|aiff|webm)$/i;
+const CUE_COLORS = ['#f87171', '#fb923c', '#fbbf24', '#a3e635', '#34d399', '#22d3ee', '#60a5fa', '#c084fc'];
+const PITCHES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+const state = {
+  tracks: [],
+  selectedId: null,
+  playingId: null,
+  checked: new Set(),
+  sort: { key: 'index', dir: 1 },
+  search: '',
+  compatOnly: false,
+  keyFilter: null,
+  view: 'library',
+  set: [],
+  settings: {
+    notation: 'camelot',
+    tagComment: true,
+    tagKeyField: true,
+    tagBpm: true,
+    tagNotation: 'camelot',
+    renamePrefix: false,
+    volume: 0.9,
+    droneMode: 'chord',
+    droneVolume: 0.25,
+    rbBasePath: '',
+    rbBeatgrid: true,
+  },
+};
+
+const $ = (sel) => document.querySelector(sel);
+const el = (tag, attrs = {}, ...children) => {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v == null || v === false) continue;
+    if (k === 'class') node.className = v;
+    else if (k === 'style') node.style.cssText = v;
+    else if (k.startsWith('on')) node.addEventListener(k.slice(2), v);
+    else if (k === 'html') node.innerHTML = v;
+    else node.setAttribute(k, v === true ? '' : v);
+  }
+  for (const c of children.flat()) {
+    if (c == null || c === false) continue;
+    node.append(c instanceof Node ? c : document.createTextNode(String(c)));
+  }
+  return node;
+};
+
+const fmtTime = (s) => {
+  if (!Number.isFinite(s)) return '0:00';
+  s = Math.max(0, s);
+  const m = Math.floor(s / 60);
+  return `${m}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+};
+const fmtBpm = (b) => (b ? (Number.isInteger(b) ? String(b) : b.toFixed(1)) : '—');
+const fileKey = (f) => `${f.name}|${f.size}|${f.lastModified || 0}`;
+const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+
+function toast(msg, type = 'info', ms = 4000) {
+  const t = el('div', { class: `toast ${type}` }, msg);
+  $('#toasts').append(t);
+  setTimeout(() => t.remove(), ms);
+}
+
+// ----------------------------------------------------- Persistencia ----
+
+const b64 = {
+  enc(u8) {
+    let s = '';
+    for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]);
+    return btoa(s);
+  },
+  dec(str) {
+    const s = atob(str);
+    const u8 = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++) u8[i] = s.charCodeAt(i);
+    return u8;
+  },
+};
+
+function serializeTrack(t) {
+  const r = t.result;
+  return {
+    id: t.id, fileKey: t.fileKey, name: t.name, relPath: t.relPath || null, title: t.title, artist: t.artist, size: t.size, addedAt: t.addedAt, index: t.index,
+    result: { ...r, waveform: Object.fromEntries(Object.entries(r.waveform).map(([k, v]) => [k, b64.enc(v)])) },
+  };
+}
+
+function deserializeTrack(o) {
+  const r = o.result;
+  // Recalcula la energía con la fórmula actual si la pista guardó sus medidas.
+  const e = r.energyDetail;
+  if (e?.centroidHz != null && e.fullness != null) {
+    r.energyDetail = energyFromFeatures({ ...e, bpm: r.bpm });
+    r.energy = r.energyDetail.level;
+  }
+  return {
+    ...o, status: 'done', progress: 1, file: null, handle: null,
+    result: { ...r, waveform: Object.fromEntries(Object.entries(r.waveform).map(([k, v]) => [k, b64.dec(v)])) },
+  };
+}
+
+let saveTimer = null;
+function save() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(flushSave, 400);
+}
+
+function flushSave() {
+  if (saveTimer === null) return;
+  clearTimeout(saveTimer);
+  saveTimer = null;
+  try {
+    const data = {
+      tracks: state.tracks.filter((t) => t.status === 'done').map(serializeTrack),
+      set: state.set,
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (err) {
+    console.warn('No se pudo guardar la biblioteca', err);
+  }
+}
+
+function saveSettings() {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+  } catch {
+    // almacenamiento no disponible
+  }
+}
+
+function load() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
+    if (s) Object.assign(state.settings, s);
+  } catch {
+    // ignorar
+  }
+  try {
+    const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+    if (data) {
+      state.tracks = (data.tracks || []).map(deserializeTrack);
+      const ids = new Set(state.tracks.map((t) => t.id));
+      state.set = (data.set || []).filter((id) => ids.has(id));
+    }
+  } catch (err) {
+    console.warn('Biblioteca guardada ilegible', err);
+  }
+}
+
+// ------------------------------------------------------- Análisis ----
+
+const MAX_WORKERS = Math.max(1, Math.min(3, (navigator.hardwareConcurrency || 2) - 1));
+const workers = [];
+const queue = [];
+let active = 0;
+
+function getWorker() {
+  let w = workers.find((x) => !x.busy);
+  if (!w) {
+    w = { worker: new Worker(KEYMIX_WORKER_URL), busy: false };
+    workers.push(w);
+  }
+  w.busy = true;
+  return w;
+}
+
+function analyzeInWorker(samples, onProgress) {
+  return new Promise((resolve, reject) => {
+    const w = getWorker();
+    const id = uid();
+    w.worker.onmessage = (e) => {
+      const m = e.data;
+      if (m.id !== id) return;
+      if (m.type === 'progress') onProgress(m.progress, m.stage);
+      else {
+        w.busy = false;
+        if (m.type === 'done') resolve(m.result);
+        else reject(new Error(m.error));
+      }
+    };
+    w.worker.onerror = (e) => {
+      w.busy = false;
+      reject(new Error(e.message || 'Error en el worker'));
+    };
+    w.worker.postMessage({ id, samples, sampleRate: ANALYSIS_SAMPLE_RATE }, [samples.buffer]);
+  });
+}
+
+const isAiffName = (name) => /\.aiff?$|\.aifc$/i.test(name);
+
+/** Remuestrea con el motor de audio del navegador (filtro antialiasing incluido). */
+async function resampleMono(mono, fromRate) {
+  if (fromRate === ANALYSIS_SAMPLE_RATE) return mono;
+  const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  const ctx = new Ctx(1, Math.ceil((mono.length * ANALYSIS_SAMPLE_RATE) / fromRate), ANALYSIS_SAMPLE_RATE);
+  const buf = ctx.createBuffer(1, mono.length, fromRate);
+  buf.copyToChannel(mono, 0);
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  src.connect(ctx.destination);
+  src.start();
+  const out = await ctx.startRendering();
+  return out.getChannelData(0).slice();
+}
+
+/** AIFF: decodificación propia (los navegadores no lo soportan) + WAV en memoria para reproducir. */
+async function decodeAiff(arrayBuffer, t) {
+  const a = parseAiff(arrayBuffer);
+  if (a.id3) {
+    const tags = readTags(a.id3.slice().buffer);
+    if (tags.title) t.title = tags.title;
+    if (tags.artist) t.artist = tags.artist;
+  }
+  t.playFile = encodeWav(a.channels, a.sampleRate);
+  const n = a.channels[0].length;
+  const mono = new Float32Array(n);
+  for (const ch of a.channels) for (let i = 0; i < n; i++) mono[i] += ch[i] / a.channels.length;
+  return resampleMono(mono, a.sampleRate);
+}
+
+async function preparePlayback(t) {
+  if (t.playFile || !t.file || !isAiffName(t.name)) return;
+  try {
+    const a = parseAiff(await t.file.arrayBuffer());
+    t.playFile = encodeWav(a.channels, a.sampleRate);
+  } catch (err) {
+    console.warn('No se pudo preparar el AIFF para reproducir', err);
+  }
+}
+
+async function decodeToMono(arrayBuffer) {
+  const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  const ctx = new Ctx(1, 1, ANALYSIS_SAMPLE_RATE);
+  const buf = await new Promise((res, rej) => {
+    const p = ctx.decodeAudioData(arrayBuffer, res, rej);
+    if (p && p.then) p.then(res, rej);
+  });
+  const n = buf.length;
+  const out = new Float32Array(n);
+  for (let c = 0; c < buf.numberOfChannels; c++) {
+    const d = buf.getChannelData(c);
+    for (let i = 0; i < n; i++) out[i] += d[i] / buf.numberOfChannels;
+  }
+  if (buf.sampleRate !== ANALYSIS_SAMPLE_RATE) throw new Error('El navegador no remuestreó el audio');
+  return out;
+}
+
+function guessFromFilename(name) {
+  const base = name.replace(/\.[^.]+$/, '').replace(/_/g, ' ').trim();
+  const m = /^(?:\d+[\s.-]+)?(.+?)\s+[-–]\s+(.+)$/.exec(base);
+  return m ? { artist: m[1].trim(), title: m[2].trim() } : { artist: '', title: base };
+}
+
+async function processTrack(t) {
+  try {
+    t.status = 'decoding';
+    t.stage = 'Decodificando';
+    scheduleRender();
+    const ab = await t.file.arrayBuffer();
+    if (/\.(mp3|wav|wave)$/i.test(t.name)) {
+      const tags = /\.mp3$/i.test(t.name) ? readTags(ab) : readContainerTags(ab);
+      if (tags.title) t.title = tags.title;
+      if (tags.artist) t.artist = tags.artist;
+    }
+    const mono = isAiff(ab) ? await decodeAiff(ab, t) : await decodeToMono(ab);
+    t.status = 'analyzing';
+    t.stage = 'Analizando';
+    scheduleRender();
+    t.result = await analyzeInWorker(mono, (p, stage) => {
+      t.progress = p;
+      t.stage = stage;
+      scheduleRender(true);
+    });
+    t.status = 'done';
+    t.progress = 1;
+    save();
+  } catch (err) {
+    console.error(err);
+    t.status = 'error';
+    t.error = /decod|Unable|EncodingError|null/i.test(err.message || '')
+      ? 'Formato no soportado por este navegador'
+      : err.message;
+  }
+  scheduleRender();
+}
+
+function pump() {
+  while (active < MAX_WORKERS && queue.length) {
+    const t = queue.shift();
+    active++;
+    processTrack(t).finally(() => {
+      active--;
+      pump();
+      if (!active && !queue.length) {
+        const done = state.tracks.filter((x) => x.status === 'done').length;
+        toast(`Análisis completado · ${done} pistas en la biblioteca`);
+      }
+    });
+  }
+  renderQueueStatus();
+}
+
+// Ruta relativa de cada archivo dentro de la carpeta abierta o arrastrada (para rekordbox XML).
+const filePaths = new WeakMap();
+
+function addFiles(files, handles = []) {
+  const list = [...files].filter((f) => AUDIO_EXT.test(f.name) || f.type.startsWith('audio/'));
+  if (!list.length) {
+    toast('No se encontraron archivos de audio', 'error');
+    return;
+  }
+  let cached = 0;
+  list.forEach((file, i) => {
+    const key = fileKey(file);
+    const existing = state.tracks.find((t) => t.fileKey === key);
+    if (existing) {
+      // Ya analizada: solo se vuelve a vincular el archivo (para reproducir/etiquetar).
+      existing.file = file;
+      existing.playFile = null;
+      existing.handle = handles[i] || existing.handle;
+      existing.relPath = filePaths.get(file) || existing.relPath || null;
+      preparePlayback(existing);
+      if (existing.status === 'error') {
+        existing.status = 'queued';
+        queue.push(existing);
+      } else cached++;
+      return;
+    }
+    const guess = guessFromFilename(file.name);
+    const t = {
+      id: uid(),
+      fileKey: key,
+      name: file.name,
+      title: guess.title,
+      artist: guess.artist,
+      size: file.size,
+      addedAt: Date.now(),
+      index: state.tracks.length + 1,
+      status: 'queued',
+      progress: 0,
+      file,
+      handle: handles[i] || null,
+      relPath: filePaths.get(file) || null,
+      result: null,
+    };
+    state.tracks.push(t);
+    queue.push(t);
+  });
+  if (cached) toast(`${cached} pista(s) ya estaban analizadas: se han vuelto a vincular`);
+  if (!state.selectedId && state.tracks.length) state.selectedId = state.tracks[0].id;
+  pump();
+  scheduleRender();
+}
+
+async function openFolder() {
+  try {
+    const dir = await window.showDirectoryPicker({ mode: 'readwrite' });
+    const files = [];
+    const handles = [];
+    async function walk(d, depth, prefix) {
+      for await (const entry of d.values()) {
+        if (entry.kind === 'file' && AUDIO_EXT.test(entry.name)) {
+          const file = await entry.getFile();
+          filePaths.set(file, prefix + entry.name);
+          handles.push(entry);
+          files.push(file);
+        } else if (entry.kind === 'directory' && depth < 4) await walk(entry, depth + 1, `${prefix}${entry.name}/`);
+      }
+    }
+    await walk(dir, 0, '');
+    addFiles(files, handles);
+  } catch (err) {
+    if (err.name !== 'AbortError') toast(`No se pudo abrir la carpeta: ${err.message}`, 'error');
+  }
+}
+
+// --------------------------------------------------------- Consultas ----
+
+const done = () => state.tracks.filter((t) => t.status === 'done' && t.result);
+const byId = (id) => state.tracks.find((t) => t.id === id);
+const camelotOf = (t) => t.result?.key?.camelot || null;
+const keyText = (t, notation = state.settings.notation) =>
+  t.result?.key ? formatKey(t.result.key.tonic, t.result.key.mode, notation) : '—';
+const keyBg = (code, alpha = 1) => {
+  const p = /^(\d+)([AB])$/.exec(code || '');
+  return p ? keyColor(Number(p[1]), p[2], alpha) : 'var(--bg-3)';
+};
+const asSetItem = (t) => ({ id: t.id, camelot: camelotOf(t), bpm: t.result.bpm, energy: t.result.energy });
+
+function relation(base, t) {
+  if (!base || base.id === t.id || !camelotOf(base) || !camelotOf(t)) return null;
+  const k = compatibility(camelotOf(base), camelotOf(t));
+  if (k.type === 'clash') return null;
+  if (bpmDistance(base.result.bpm, t.result.bpm) > 6) return null;
+  return k;
+}
+
+function visibleTracks() {
+  const q = state.search.trim().toLowerCase();
+  const sel = byId(state.selectedId);
+  let list = state.tracks.filter((t) => {
+    if (q) {
+      const hay = `${t.title} ${t.artist} ${t.name} ${t.result ? `${keyText(t, 'camelot')} ${keyText(t, 'openkey')} ${keyText(t, 'musical')} ${fmtBpm(t.result.bpm)}` : ''}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (state.keyFilter && camelotOf(t) !== state.keyFilter) return false;
+    if (state.compatOnly && sel?.result && t.id !== sel.id && !(t.result && relation(sel, t))) return false;
+    return true;
+  });
+  const { key, dir } = state.sort;
+  const val = (t) => {
+    switch (key) {
+      case 'title': return `${t.title} ${t.artist}`.toLowerCase();
+      case 'key': {
+        const c = /^(\d+)([AB])$/.exec(camelotOf(t) || '');
+        return c ? Number(c[1]) * 2 + (c[2] === 'B' ? 1 : 0) : 999;
+      }
+      case 'bpm': return t.result?.bpm ?? 9999;
+      case 'energy': return t.result?.energy ?? 99;
+      case 'duration': return t.result?.duration ?? 1e9;
+      default: return t.index;
+    }
+  };
+  list = [...list].sort((a, b) => {
+    const va = val(a);
+    const vb = val(b);
+    return (va < vb ? -1 : va > vb ? 1 : 0) * dir;
+  });
+  return list;
+}
+
+// ------------------------------------------------------------ Render ----
+
+let renderPending = false;
+let lightRender = false;
+function scheduleRender(light = false) {
+  lightRender = renderPending ? lightRender && light : light;
+  if (renderPending) return;
+  renderPending = true;
+  requestAnimationFrame(() => {
+    renderPending = false;
+    if (lightRender) renderProgressOnly();
+    else render();
+  });
+}
+
+function render() {
+  renderTable();
+  renderWheel();
+  renderDetails();
+  renderPlayerInfo();
+  renderQueueStatus();
+  if (state.view === 'set') renderSet();
+  drawWaveform();
+}
+
+function energyBar(level) {
+  const color = `hsl(${140 - (level - 1) * 15}, 75%, 55%)`;
+  const bar = el('span', { class: 'energy-bar', style: `--e-color:${color}`, title: `Energía ${level}/10` });
+  for (let i = 1; i <= 10; i++) bar.append(el('i', { class: i <= level ? 'on' : '' }));
+  bar.append(el('b', {}, level));
+  return bar;
+}
+
+function keyChip(t, cls = '') {
+  const code = camelotOf(t);
+  return el('span', { class: `key-chip ${cls}`, style: `background:${keyBg(code)}` }, keyText(t));
+}
+
+function statusCell(t) {
+  if (t.status === 'done') return el('span', { class: 'status' }, t.file ? '✓ Analizada' : '✓ En caché');
+  if (t.status === 'error') return el('span', { class: 'status error', title: t.error }, `✕ ${t.error}`);
+  const label = t.status === 'queued' ? 'En cola' : t.stage || 'Analizando';
+  return el('div', {}, el('span', { class: 'status' }, label),
+    el('div', { class: 'progress' }, el('div', { style: `width:${Math.round((t.progress || 0) * 100)}%`, 'data-progress': t.id })));
+}
+
+function renderTable() {
+  const body = $('#track-body');
+  const list = visibleTracks();
+  const sel = byId(state.selectedId);
+  body.replaceChildren(
+    ...list.map((t) => {
+      const rel = sel?.result && t.result ? relation(sel, t) : null;
+      const tr = el('tr', {
+        'data-id': t.id,
+        class: [t.id === state.selectedId && 'selected', t.id === state.playingId && 'playing'].filter(Boolean).join(' '),
+      },
+      el('td', { class: 'c-check' }, el('input', { type: 'checkbox', 'data-check': t.id, checked: state.checked.has(t.id) })),
+      el('td', { class: 'c-num' }, t.index),
+      el('td', {},
+        el('div', { class: 't-title', title: t.name }, rel ? el('span', { class: `compat-dot compat-${rel.type}`, title: rel.label }) : null, t.title),
+        el('div', { class: 't-artist' }, t.artist || t.name)),
+      el('td', { class: 'c-key' }, t.result?.key ? keyChip(t) : '—'),
+      el('td', { class: 'c-bpm' }, t.result ? fmtBpm(t.result.bpm) : '—'),
+      el('td', { class: 'c-energy' }, t.result ? energyBar(t.result.energy) : '—'),
+      el('td', { class: 'c-dur' }, t.result ? fmtTime(t.result.duration) : '—'),
+      el('td', { class: 'c-status' }, statusCell(t)));
+      return tr;
+    }),
+  );
+  $('#empty-state').hidden = state.tracks.length > 0;
+  $('#track-count').textContent = state.tracks.length
+    ? `${list.length} de ${state.tracks.length} pistas${state.checked.size ? ` · ${state.checked.size} marcadas` : ''}`
+    : '';
+  document.querySelectorAll('.tracks th[data-sort]').forEach((th) => {
+    th.classList.toggle('sorted', th.dataset.sort === state.sort.key);
+    th.classList.toggle('desc', th.dataset.sort === state.sort.key && state.sort.dir < 0);
+  });
+  const chip = $('#key-filter-chip');
+  chip.hidden = !state.keyFilter;
+  if (state.keyFilter) {
+    const k = fromCamelot(state.keyFilter);
+    chip.textContent = `Tono: ${formatKey(k.tonic, k.mode, state.settings.notation)} ✕`;
+  }
+  $('#check-all').checked = list.length > 0 && list.every((t) => state.checked.has(t.id));
+}
+
+function renderProgressOnly() {
+  for (const t of state.tracks) {
+    if (t.status !== 'analyzing') continue;
+    const bar = document.querySelector(`[data-progress="${t.id}"]`);
+    if (!bar) return render();
+    bar.style.width = `${Math.round((t.progress || 0) * 100)}%`;
+    const label = bar.parentElement?.previousElementSibling;
+    if (label) label.textContent = t.stage || 'Analizando';
+  }
+  renderQueueStatus();
+}
+
+function renderQueueStatus() {
+  const pending = state.tracks.filter((t) => t.status === 'queued' || t.status === 'decoding' || t.status === 'analyzing').length;
+  $('#queue-status').textContent = pending ? `Analizando… ${pending} pendiente(s)` : '';
+}
+
+// --------------------------------------------------- Rueda Camelot ----
+
+function sector(r0, r1, a0, a1) {
+  const p = (r, a) => `${(r * Math.sin(a)).toFixed(2)} ${(-r * Math.cos(a)).toFixed(2)}`;
+  return `M${p(r1, a0)} A${r1} ${r1} 0 0 1 ${p(r1, a1)} L${p(r0, a1)} A${r0} ${r0} 0 0 0 ${p(r0, a0)} Z`;
+}
+
+function renderWheel() {
+  const svg = $('#wheel');
+  const sel = byId(state.selectedId);
+  const selCode = camelotOf(sel || {});
+  const counts = {};
+  for (const t of done()) counts[camelotOf(t)] = (counts[camelotOf(t)] || 0) + 1;
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, text) => {
+    const n = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+    if (text != null) n.textContent = text;
+    return n;
+  };
+  const nodes = [];
+  for (let n = 1; n <= 12; n++) {
+    const a0 = ((n % 12) - 0.5) * (Math.PI / 6);
+    const a1 = a0 + Math.PI / 6;
+    const am = (a0 + a1) / 2;
+    for (const [l, r0, r1] of [['B', 70, 104], ['A', 38, 70]]) {
+      const code = `${n}${l}`;
+      let opacity = 0.35;
+      if (selCode) {
+        const rel = compatibility(selCode, code);
+        opacity = code === selCode ? 1 : rel.type === 'perfect' ? 0.85 : rel.type !== 'clash' ? 0.6 : 0.15;
+      } else if (counts[code]) opacity = 0.9;
+      if (state.keyFilter === code) opacity = 1;
+      const path = mk('path', {
+        d: sector(r0, r1, a0 + 0.008, a1 - 0.008),
+        fill: keyColor(n, l),
+        class: 'seg',
+        'data-code': code,
+        style: `opacity:${opacity}`,
+        stroke: code === selCode || code === state.keyFilter ? 'var(--text)' : 'none',
+        'stroke-width': 2,
+      });
+      const k = fromCamelot(code);
+      path.append(mk('title', {}, `${code} · ${formatKey(k.tonic, k.mode, 'musical')} · ${formatKey(k.tonic, k.mode, 'openkey')} — ${counts[code] || 0} pista(s)`));
+      nodes.push(path);
+      const rm = (r0 + r1) / 2;
+      const label = formatKey(k.tonic, k.mode, state.settings.notation);
+      nodes.push(mk('text', { x: rm * Math.sin(am), y: -rm * Math.cos(am) - (counts[code] ? 3 : 0) }, label));
+      if (counts[code]) nodes.push(mk('text', { class: 'count', x: rm * Math.sin(am), y: -rm * Math.cos(am) + 6 }, counts[code]));
+    }
+  }
+  nodes.push(mk('circle', { r: 36, fill: 'var(--bg-2)' }));
+  if (sel?.result?.key) {
+    nodes.push(mk('text', { class: 'center-label', y: -4 }, keyText(sel)));
+    nodes.push(mk('text', { class: 'center-sub', y: 10 }, `${fmtBpm(sel.result.bpm)} BPM`));
+  } else {
+    nodes.push(mk('text', { class: 'center-sub', y: 0 }, 'Camelot'));
+  }
+  svg.replaceChildren(...nodes);
+}
+
+// ----------------------------------------------------------- Detalle ----
+
+function suggestions(base, limit = 8) {
+  if (!base?.result?.key) return [];
+  const a = asSetItem(base);
+  return done()
+    .filter((t) => t.id !== base.id && relation(base, t))
+    .map((t) => ({ t, cost: transitionCost(a, asSetItem(t)), rel: relation(base, t) }))
+    .sort((x, y) => x.cost - y.cost)
+    .slice(0, limit);
+}
+
+function renderDetails() {
+  const box = $('#details');
+  const t = byId(state.selectedId);
+  if (!t) {
+    box.replaceChildren(el('p', { class: 'muted' }, 'Selecciona una pista para ver su análisis.'));
+    return;
+  }
+  const head = [el('h3', {}, t.title), el('div', { class: 'artist' }, t.artist || t.name)];
+  if (!t.result) {
+    box.replaceChildren(...head, statusCell(t));
+    return;
+  }
+  const r = t.result;
+  const k = r.key;
+  const s = state.settings;
+  const tonicPc = k ? k.tonic : -1;
+
+  const cueList = el('ul', { class: 'cue-list' },
+    r.cues.map((c, i) =>
+      el('li', { onclick: () => jumpToCue(t, i) },
+        el('span', { class: 'cue-num', style: `background:${CUE_COLORS[i]}` }, i + 1),
+        el('span', {}, c.label),
+        el('span', { class: 'cue-time' }, `${fmtTime(c.time)}${c.bar != null ? ` · compás ${c.bar + 1}` : ''}`))));
+
+  const sugg = suggestions(t);
+  const suggList = sugg.length
+    ? el('ul', { class: 'suggest-list' },
+      sugg.map(({ t: o, rel }) =>
+        el('li', { onclick: () => select(o.id, true), title: rel.label },
+          el('span', { class: `compat-dot compat-${rel.type}` }),
+          keyChip(o),
+          el('span', { class: 's-title' }, o.title),
+          el('span', { class: 's-meta' }, `${fmtBpm(o.result.bpm)} · E${o.result.energy}`))))
+    : el('p', { class: 'muted' }, 'No hay pistas compatibles en la biblioteca todavía.');
+
+  const taggable = isTaggable(t.name);
+  const canSaveInPlace = !!t.handle && !s.renamePrefix;
+  const opt = (key, label) =>
+    el('label', {}, el('input', {
+      type: 'checkbox', checked: s[key],
+      onchange: (e) => { s[key] = e.target.checked; saveSettings(); },
+    }), label);
+
+  const tagBox = el('div', { class: 'tag-box' },
+    opt('tagComment', `Comentario («${tagKeyString(t)} - Energy ${r.energy}»)`),
+    opt('tagKeyField', 'Campo de tonalidad (TKEY)'),
+    opt('tagBpm', 'Campo BPM (TBPM)'),
+    opt('renamePrefix', 'Añadir tonalidad y BPM al nombre (descarga)'),
+    el('label', {}, 'Notación en etiquetas',
+      el('select', { onchange: (e) => { s.tagNotation = e.target.value; saveSettings(); renderDetails(); } },
+        ['camelot', 'openkey', 'musical'].map((n) => el('option', { value: n, selected: s.tagNotation === n }, { camelot: 'Camelot', openkey: 'Open Key', musical: 'Musical' }[n])))),
+    el('button', {
+      class: 'btn primary', disabled: !taggable || !t.file,
+      title: !taggable ? 'Las etiquetas se pueden escribir en MP3, AIFF y WAV' : !t.file ? 'Vuelve a añadir el archivo para poder etiquetarlo' : '',
+      onclick: () => tagTrack(t),
+    }, canSaveInPlace ? 'Guardar etiquetas en el archivo original' : 'Descargar copia etiquetada'),
+    'showDirectoryPicker' in window && taggable && t.file
+      ? el('button', { class: 'btn', onclick: () => copyTaggedToFolder(t) }, 'Guardar copia etiquetada en otra carpeta…')
+      : null,
+    el('p', { class: 'hint' }, !taggable
+      ? 'Este formato no admite etiquetas desde la app (solo MP3, AIFF y WAV).'
+      : canSaveInPlace
+        ? 'Se escribe un bloque ID3 dentro del archivo. El audio no se modifica.'
+        : 'Se descargará una copia con el mismo formato y el audio intacto. Para guardar en tus archivos originales, ábrelos con «Abrir carpeta» (Chrome o Edge).'));
+
+  box.replaceChildren(
+    ...head,
+    el('div', { class: 'key-row' },
+      k ? keyChip(t, 'lg') : el('span', { class: 'key-chip lg' }, '?'),
+      k ? el('div', { class: 'key-alt' },
+        el('div', {}, 'Camelot ', el('b', {}, k.camelot), ' · Open Key ', el('b', {}, k.openKey)),
+        el('div', {}, 'Tonalidad ', el('b', {}, `${k.musical} ${k.mode === 'major' ? '(mayor)' : '(menor)'}`)),
+        el('div', {}, `Confianza ${Math.round(k.confidence * 100)}%`, k.alternatives?.length ? ` · alt. ${k.alternatives.join(', ')}` : ''),
+        k.tuningCents ? el('div', {}, `Afinación ${k.tuningCents > 0 ? '+' : ''}${k.tuningCents} cents`) : null) : null),
+    k ? el('div', { class: 'section-title' }, 'Comprobar a oído') : null,
+    k ? droneBox(t) : null,
+    el('div', { class: 'stats' },
+      el('div', { class: 'stat' }, el('div', { class: 'v' }, fmtBpm(r.bpm)), el('div', { class: 'l' }, 'BPM')),
+      el('div', { class: 'stat' }, el('div', { class: 'v' }, r.energy), el('div', { class: 'l' }, 'Energía')),
+      el('div', { class: 'stat' }, el('div', { class: 'v' }, fmtTime(r.duration)), el('div', { class: 'l' }, 'Duración'))),
+    energyBar(r.energy),
+    el('div', { class: 'section-title' }, 'Perfil tonal (cromagrama)'),
+    el('div', { class: 'chroma' }, (k?.chroma || []).map((v, i) =>
+      el('div', { class: i === tonicPc ? 'tonic' : '', style: `height:${Math.max(3, v * 100)}%`, title: `${PITCHES[i]}: ${Math.round(v * 100)}%` }))),
+    el('div', { class: 'chroma-labels' }, PITCHES.map((p) => el('span', {}, p))),
+    el('div', { class: 'section-title' }, 'Cue points'),
+    cueList,
+    el('div', { class: 'section-title' }, 'Mezclan bien a continuación'),
+    suggList,
+    el('div', { class: 'section-title' }, 'Escribir etiquetas (MP3, AIFF, WAV)'),
+    tagBox,
+    el('div', { class: 'section-title' }, 'Cómo se calculó la energía'),
+    energyBreakdown(r),
+  );
+}
+
+function energyBreakdown(r) {
+  const e = r.energyDetail || {};
+  if (!e.parts) {
+    return el('p', { class: 'hint' }, `Volumen activo ${e.loudnessDb ?? '?'} dBFS · ${e.onsetsPerSec ?? '?'} ataques/s. Vuelve a analizar la pista (Vaciar biblioteca y añadirla de nuevo) para ver el desglose completo.`);
+  }
+  const w = e.weights || { L: 40, D: 15, C: 15, B: 15, F: 15 };
+  const rows = [
+    ['Volumen', `${e.loudnessDb} dBFS`, e.parts.L, w.L],
+    ['Golpes', `${e.onsetsPerSec} /s`, e.parts.D, w.D],
+    ['Brillo', `${e.centroidHz} Hz`, e.parts.C, w.C],
+    ['Tempo', `${fmtBpm(r.bpm)} BPM`, e.parts.B, w.B],
+    ['Plenitud', `${Math.round(e.fullness * 100)} %`, e.parts.F, w.F],
+  ];
+  return el('div', { class: 'energy-breakdown' },
+    rows.map(([name, raw, part, w]) => el('div', { class: 'eb-row', title: `Aporta ${(part * w / 100).toFixed(3)} a la puntuación (peso ${w} %)` },
+      el('span', { class: 'eb-name' }, `${name} ${w} %`),
+      el('span', { class: 'eb-raw' }, raw),
+      el('span', { class: 'eb-bar' }, el('i', { style: `width:${Math.round(part * 100)}%` })),
+      el('span', { class: 'eb-val' }, part.toFixed(2)))),
+    el('div', { class: 'eb-total' }, `Puntuación ${e.score.toFixed(2)} → energía ${r.energy}`));
+}
+
+// ------------------------------------------------- Tono de referencia ----
+// Un acorde o nota suave que suena encima de la canción para comprobar la tonalidad a oído.
+
+const drone = { ctx: null, master: null, voices: [], code: null };
+
+function startDrone(code) {
+  stopDrone();
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return toast('Este navegador no permite generar sonido', 'error');
+  if (!drone.ctx) drone.ctx = new Ctx();
+  const ctx = drone.ctx;
+  ctx.resume?.();
+  const master = ctx.createGain();
+  master.gain.value = 0;
+  const lp = ctx.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = 1400;
+  master.connect(lp);
+  lp.connect(ctx.destination);
+  const voices = referenceMidi(code, state.settings.droneMode).map((m, i) => {
+    const o = ctx.createOscillator();
+    o.type = i === 0 ? 'sine' : 'triangle';
+    o.frequency.value = 440 * 2 ** ((m - 69) / 12);
+    const g = ctx.createGain();
+    g.gain.value = i === 0 ? 0.55 : 0.3;
+    o.connect(g);
+    g.connect(master);
+    o.start();
+    return o;
+  });
+  master.gain.setTargetAtTime(state.settings.droneVolume, ctx.currentTime, 0.08); // entrada suave, sin clics
+  Object.assign(drone, { master, voices, code });
+}
+
+function stopDrone() {
+  const { ctx, master, voices } = drone;
+  if (ctx && master) {
+    master.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+    for (const o of voices) o.stop(ctx.currentTime + 0.3);
+  }
+  Object.assign(drone, { master: null, voices: [], code: null });
+}
+
+function toggleDrone(code) {
+  if (drone.code === code) stopDrone();
+  else startDrone(code);
+  renderDroneButtons();
+}
+
+function renderDroneButtons() {
+  document.querySelectorAll('[data-drone]').forEach((b) => {
+    const on = b.dataset.drone === drone.code;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', on);
+  });
+}
+
+/** Tonalidades a comparar: la detectada, sus alternativas y su relativa. */
+function droneCandidates(k) {
+  return [...new Set([k.camelot, ...(k.alternatives || []), relativeCode(k.camelot)])].filter(Boolean);
+}
+
+function droneBox(t) {
+  const k = t.result.key;
+  const s = state.settings;
+  const name = (code) => {
+    const c = fromCamelot(code);
+    return formatKey(c.tonic, c.mode, s.notation);
+  };
+  const label = (code, i) => (i === 0 ? 'detectada' : code === relativeCode(k.camelot) ? 'relativa' : 'alternativa');
+  return el('div', { class: 'drone-box' },
+    el('div', { class: 'drone-keys' }, droneCandidates(k).map((code, i) => {
+      const c = fromCamelot(code);
+      return el('button', {
+        class: `drone-btn ${drone.code === code ? 'on' : ''}`,
+        'data-drone': code,
+        'aria-pressed': drone.code === code,
+        style: `--k:${keyBg(code)}`,
+        title: `${formatKey(c.tonic, c.mode, 'musical')} ${c.mode === 'major' ? 'mayor' : 'menor'} · pulsa para escucharla encima de la canción`,
+        onclick: () => toggleDrone(code),
+      }, el('b', {}, name(code)), el('small', {}, label(code, i)));
+    })),
+    el('div', { class: 'drone-controls' },
+      el('label', {}, 'Sonido ',
+        el('select', {
+          id: 'drone-mode',
+          onchange: (e) => {
+            s.droneMode = e.target.value;
+            saveSettings();
+            if (drone.code) startDrone(drone.code);
+          },
+        }, el('option', { value: 'chord', selected: s.droneMode === 'chord' }, 'Acorde'),
+        el('option', { value: 'note', selected: s.droneMode === 'note' }, 'Solo la tónica'))),
+      el('label', {}, 'Volumen ',
+        el('input', {
+          id: 'drone-volume', type: 'range', min: 0.02, max: 0.6, step: 0.01, value: s.droneVolume,
+          oninput: (e) => {
+            s.droneVolume = Number(e.target.value);
+            saveSettings();
+            if (drone.master) drone.master.gain.setTargetAtTime(s.droneVolume, drone.ctx.currentTime, 0.05);
+          },
+        }))),
+    el('details', { class: 'drone-help' },
+      el('summary', {}, 'Cómo usarlo'),
+      el('ol', {},
+        el('li', {}, 'Reproduce la canción en una parte con armonía: salta a un cue de Drop o Break (teclas 1–8). Evita las intros de solo percusión.'),
+        el('li', {}, 'Pulsa la tonalidad «detectada». Suena un acorde suave encima de la música (tecla T).'),
+        el('li', {}, 'Si es la correcta, el acorde se funde con la canción y suena estable, «en casa». Si no lo es, notarás roces, tensión o un batido que ondula.'),
+        el('li', {}, 'Pulsa las otras opciones para comparar y quédate con la que mejor encaje. Vuelve a pulsar para apagar.')),
+      el('p', {}, 'Consejo: «Solo la tónica» ayuda a encontrar la nota central; «Acorde» ayuda a distinguir mayor de menor, por ejemplo 8A frente a 8B, que comparten las mismas notas.')));
+}
+
+// -------------------------------------------------------- Etiquetas ----
+
+function tagKeyString(t) {
+  const k = t.result.key;
+  return k ? formatKey(k.tonic, k.mode, state.settings.tagNotation) : '';
+}
+
+function downloadBlob(blob, name) {
+  const a = el('a', { href: URL.createObjectURL(blob), download: name });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+}
+
+// Diálogos propios: algunos entornos (iframes aislados) bloquean confirm() y las descargas.
+function openDialog(title, body, buttons) {
+  return new Promise((resolve) => {
+    const close = (v) => { overlay.remove(); resolve(v); };
+    const overlay = el('div', { class: 'modal-overlay', onclick: (e) => { if (e.target === overlay) close(false); } },
+      el('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true', 'aria-label': title },
+        el('h3', {}, title), body,
+        el('div', { class: 'modal-actions' }, buttons.map((b) =>
+          el('button', { class: `btn ${b.primary ? 'primary' : ''} ${b.danger ? 'danger' : ''}`, onclick: () => (b.action ? b.action(close) : close(b.value)) }, b.label)))));
+    overlay.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(false); });
+    document.body.append(overlay);
+    overlay.querySelector('.modal-actions .btn:last-child')?.focus();
+  });
+}
+
+function confirmDialog(title, message, okLabel = 'Aceptar', danger = false) {
+  return openDialog(title, el('p', {}, message), [
+    { label: 'Cancelar', value: false },
+    { label: okLabel, value: true, primary: !danger, danger },
+  ]);
+}
+
+/** Muestra un texto exportable con opciones de copiar y descargar. */
+function exportText(text, filename, type) {
+  const area = el('textarea', { class: 'export-text', readonly: true, id: 'export-text', 'aria-label': filename });
+  area.value = text;
+  return openDialog(filename, el('div', {}, area), [
+    { label: 'Cerrar', value: false },
+    { label: 'Descargar', action: () => downloadBlob(new Blob([type.startsWith('text/csv') ? '\ufeff' + text : text], { type }), filename) },
+    {
+      label: 'Copiar', primary: true, action: (close) => {
+        navigator.clipboard.writeText(text).then(() => { toast('Copiado al portapapeles'); close(true); }, () => {
+          area.focus();
+          area.select();
+          toast('Selecciona el texto y cópialo con Ctrl+C');
+        });
+      },
+    },
+  ]);
+}
+
+function tagValues(t) {
+  const s = state.settings;
+  const keyStr = tagKeyString(t);
+  const values = {};
+  if (s.tagKeyField && keyStr) values.key = keyStr;
+  if (s.tagBpm && t.result.bpm) values.bpm = Math.round(t.result.bpm);
+  if (s.tagComment) values.comment = `${keyStr} - Energy ${t.result.energy}`;
+  return values;
+}
+
+/** Nombre del archivo etiquetado (con prefijo «8A - 124 - » si está activada la opción). */
+function taggedName(t) {
+  if (!state.settings.renamePrefix) return t.name;
+  return `${tagKeyString(t)} - ${fmtBpm(Math.round(t.result.bpm))} - ${t.name}`.replace(/[\\/:*?"<>|]/g, '_');
+}
+
+/** Lee el archivo original (sin modificarlo) y devuelve un Blob con la copia etiquetada. */
+async function buildTaggedBlob(t, values) {
+  // MP3: etiqueta al principio. AIFF/WAV: bloque ID3 dentro del archivo; el audio se copia tal cual.
+  const ab = await t.file.arrayBuffer();
+  return /\.mp3$/i.test(t.name) ? writeTags(ab, values) : writeContainerTags(ab, values);
+}
+
+async function tagTrack(t, { quiet = false, forceDownload = false } = {}) {
+  const s = state.settings;
+  const values = tagValues(t);
+  if (!Object.keys(values).length && !s.renamePrefix) {
+    toast('Activa al menos una opción de etiquetado', 'error');
+    return false;
+  }
+  try {
+    const blob = await buildTaggedBlob(t, values);
+    if (t.handle && !s.renamePrefix && !forceDownload) {
+      if ((await t.handle.queryPermission?.({ mode: 'readwrite' })) !== 'granted') {
+        const p = await t.handle.requestPermission?.({ mode: 'readwrite' });
+        if (p && p !== 'granted') throw new Error('Permiso de escritura denegado');
+      }
+      const w = await t.handle.createWritable();
+      await w.write(blob);
+      await w.close();
+      t.file = await t.handle.getFile();
+      t.fileKey = fileKey(t.file);
+      save();
+      if (!quiet) toast(`Etiquetas guardadas en «${t.name}»`);
+    } else {
+      const name = taggedName(t);
+      downloadBlob(blob, name);
+      if (!quiet) toast(`Descargado «${name}»`);
+    }
+    return true;
+  } catch (err) {
+    toast(`No se pudo etiquetar «${t.name}»: ${err.message}`, 'error', 6000);
+    return false;
+  }
+}
+
+async function tagAll() {
+  const list = done().filter((t) => isTaggable(t.name) && t.file);
+  if (!list.length) {
+    toast('No hay archivos MP3, AIFF o WAV vinculados para etiquetar (vuelve a añadirlos)', 'error');
+    return;
+  }
+  const inPlace = list.every((t) => t.handle) && !state.settings.renamePrefix;
+  const msg = inPlace
+    ? `Se escribirán las etiquetas dentro de ${list.length} archivo(s) originales. El audio no se modifica.`
+    : `Se descargarán ${list.length} copias etiquetadas. Para escribir en los originales usa «Abrir carpeta» (Chrome/Edge).`;
+  if (!(await confirmDialog('Etiquetar todos', msg, inPlace ? 'Escribir etiquetas' : 'Descargar'))) return;
+  let ok = 0;
+  for (const t of list) {
+    if (await tagTrack(t, { quiet: true })) ok++;
+    toast(`Etiquetando… ${ok} de ${list.length}`, 'info', 1200);
+  }
+  toast(`${ok} de ${list.length} archivos etiquetados`);
+}
+
+/** Primer nombre libre en la carpeta: «x.aiff», «x (2).aiff», «x (3).aiff»… Nunca sobrescribe. */
+async function freeName(dir, name) {
+  const dot = name.lastIndexOf('.');
+  const base = dot > 0 ? name.slice(0, dot) : name;
+  const ext = dot > 0 ? name.slice(dot) : '';
+  for (let i = 1; i < 1000; i++) {
+    const candidate = i === 1 ? name : `${base} (${i})${ext}`;
+    try {
+      await dir.getFileHandle(candidate); // existe: probar el siguiente
+    } catch (err) {
+      if (err.name === 'NotFoundError') return candidate;
+      throw err;
+    }
+  }
+  throw new Error('Demasiados archivos con el mismo nombre');
+}
+
+/**
+ * Escribe copias etiquetadas en otra carpeta. Los originales solo se leen.
+ * Usa las pistas marcadas; si no hay ninguna marcada, la pista indicada o todas.
+ */
+async function copyTaggedToFolder(only = null) {
+  const marked = done().filter((t) => state.checked.has(t.id));
+  const pool = only ? [only] : marked.length ? marked : done();
+  const list = pool.filter((t) => isTaggable(t.name) && t.file);
+  const skipped = pool.length - list.length;
+  if (!list.length) {
+    toast('No hay pistas MP3, AIFF o WAV con archivo vinculado (vuelve a añadirlas)', 'error');
+    return;
+  }
+  if (!Object.keys(tagValues(list[0])).length && !state.settings.renamePrefix) {
+    toast('Activa al menos una opción de etiquetado en el panel de la pista', 'error');
+    return;
+  }
+  if (!('showDirectoryPicker' in window)) {
+    const ok = await confirmDialog('Copiar etiquetadas',
+      `Este navegador no permite elegir una carpeta de destino. Se descargarán ${list.length} copia(s) etiquetada(s) en tu carpeta de descargas. Para elegir carpeta usa Chrome o Edge.`, 'Descargar');
+    if (!ok) return;
+    for (const t of list) downloadBlob(await buildTaggedBlob(t, tagValues(t)), taggedName(t));
+    return;
+  }
+  const scope = only ? `«${only.title}»` : marked.length ? `las ${list.length} pistas marcadas` : `las ${list.length} pistas de la biblioteca`;
+  const go = await confirmDialog('Copiar etiquetadas a otra carpeta',
+    `Se guardará una copia etiquetada de ${scope} en la carpeta que elijas, con el mismo formato y el audio intacto. Tus archivos originales no se modifican y no se sobrescribe nada en el destino.${skipped ? ` Se omitirán ${skipped} pista(s) sin archivo vinculado o en un formato sin etiquetas.` : ''}`,
+    'Elegir carpeta');
+  if (!go) return;
+  let dir;
+  try {
+    dir = await window.showDirectoryPicker({ id: 'keymix-destino', mode: 'readwrite', startIn: 'music' });
+  } catch (err) {
+    if (err.name !== 'AbortError') toast(`No se pudo abrir la carpeta: ${err.message}`, 'error');
+    return;
+  }
+  let ok = 0;
+  const renamed = [];
+  const failed = [];
+  for (const t of list) {
+    try {
+      const blob = await buildTaggedBlob(t, tagValues(t));
+      const wanted = taggedName(t);
+      const name = await freeName(dir, wanted);
+      if (name !== wanted) renamed.push(name);
+      const fh = await dir.getFileHandle(name, { create: true });
+      const w = await fh.createWritable();
+      await w.write(blob);
+      await w.close();
+      ok++;
+      if (list.length > 1) toast(`Copiando… ${ok} de ${list.length}`, 'info', 1200);
+    } catch (err) {
+      failed.push(`${t.name}: ${err.message}`);
+    }
+  }
+  toast(`${ok} copia(s) etiquetada(s) guardada(s) en «${dir.name}»${renamed.length ? ` · ${renamed.length} renombrada(s) para no sobrescribir` : ''}`, 'info', 6000);
+  if (failed.length) toast(`No se pudieron copiar ${failed.length}: ${failed.slice(0, 3).join(' · ')}`, 'error', 9000);
+}
+
+// --------------------------------------------------- Rekordbox XML ----
+
+async function exportRekordbox() {
+  const marked = done().filter((t) => state.checked.has(t.id));
+  const list = marked.length ? marked : done();
+  if (!list.length) return toast('La biblioteca está vacía', 'error');
+  const s = state.settings;
+  const hasSub = list.some((t) => t.relPath?.includes('/'));
+  const path = el('input', {
+    id: 'rb-path', type: 'text', value: s.rbBasePath || '', placeholder: 'F:\\06_Musica\\Etiquetadas',
+    style: 'width:100%;padding:7px 9px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text)',
+  });
+  const chk = (id, label, checked, note) => el('label', { style: 'display:flex;gap:8px;align-items:flex-start;font-size:13px' },
+    el('input', { type: 'checkbox', id, checked }), el('span', {}, label, note ? el('br') : null, note ? el('small', { class: 'muted' }, note) : null));
+  const body = el('div', { style: 'display:grid;gap:10px' },
+    el('p', {}, `Se exportarán ${list.length} ${marked.length ? 'pistas marcadas' : 'pistas'} con sus cue points, tonalidad, BPM y comentario.`),
+    el('label', { style: 'display:grid;gap:4px;font-size:13px' },
+      'Carpeta donde están los archivos que vas a cargar en Rekordbox (cópiala de la barra de direcciones del Explorador):', path),
+    hasSub ? chk('rb-sub', 'Respetar subcarpetas', true, 'Desmárcalo si los archivos están todos juntos, por ejemplo en la carpeta de copias etiquetadas.') : null,
+    chk('rb-prefix', 'Los nombres llevan el prefijo «8A - 124 - »', s.renamePrefix, 'Márcalo si copiaste las pistas con la opción «Añadir tonalidad y BPM al nombre».'),
+    chk('rb-grid', 'Incluir la rejilla de beats (BPM y primer tiempo)', s.rbBeatgrid !== false, 'Desmárcalo si prefieres que Rekordbox calcule su propia rejilla.'));
+  const ok = await openDialog('Exportar para Rekordbox (XML)', body, [
+    { label: 'Cancelar', value: false },
+    {
+      label: 'Crear XML', primary: true, action: (close) => {
+        if (!path.value.trim()) {
+          path.focus();
+          return toast('Escribe la carpeta donde están los archivos', 'error');
+        }
+        close(true);
+      },
+    },
+  ]);
+  if (!ok) return;
+  s.rbBasePath = path.value.trim().replace(/[\\/]+$/, '');
+  s.rbBeatgrid = body.querySelector('#rb-grid').checked;
+  saveSettings();
+  const usePrefix = body.querySelector('#rb-prefix').checked;
+  const useSub = hasSub ? body.querySelector('#rb-sub').checked : false;
+  const items = list.map((t) => {
+    const name = usePrefix ? `${tagKeyString(t)} - ${fmtBpm(Math.round(t.result.bpm))} - ${t.name}`.replace(/[\\/:*?"<>|]/g, '_') : t.name;
+    const rel = t.relPath ? t.relPath.replace(/[^/]+$/, name) : name;
+    return {
+      title: t.title, artist: t.artist, name, relPath: rel, size: t.size,
+      keyText: tagKeyString(t), comment: `${tagKeyString(t)} - Energy ${t.result.energy}`, result: t.result,
+    };
+  });
+  const pos = new Map(list.map((t, i) => [t.id, i]));
+  const playlists = [{ name: 'KeyMix Pro', ids: list.map((_, i) => i) }];
+  const setIdx = state.set.map((id) => pos.get(id)).filter((i) => i != null);
+  if (setIdx.length) playlists.push({ name: 'KeyMix Pro · Set armónico', ids: setIdx });
+  const xml = buildRekordboxXml(items, { basePath: s.rbBasePath, useSubfolders: useSub, cueColors: CUE_COLORS, playlists, beatgrid: s.rbBeatgrid });
+  exportText(xml, 'keymix-rekordbox.xml', 'application/xml');
+}
+
+// ------------------------------------------------------- Exportación ----
+
+function csvEscape(v) {
+  const s = String(v ?? '');
+  return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function exportCsv(tracks, filename) {
+  const rows = [['#', 'Título', 'Artista', 'Archivo', 'Camelot', 'Open Key', 'Tonalidad', 'BPM', 'Energía', 'Duración', 'Cue points']];
+  tracks.forEach((t, i) => {
+    const r = t.result;
+    rows.push([i + 1, t.title, t.artist, t.name, r.key?.camelot, r.key?.openKey, r.key?.musical, r.bpm, r.energy, fmtTime(r.duration),
+      r.cues.map((c, j) => `${j + 1}:${c.label}@${fmtTime(c.time)}`).join(' | ')]);
+  });
+  exportText(rows.map((r) => r.map(csvEscape).join(',')).join('\r\n'), filename, 'text/csv;charset=utf-8');
+}
+
+function exportJson() {
+  const data = done().map((t) => {
+    const { waveform, ...rest } = t.result;
+    return { title: t.title, artist: t.artist, file: t.name, ...rest };
+  });
+  exportText(JSON.stringify(data, null, 2), 'keymix-biblioteca.json', 'application/json');
+}
+
+function exportM3u(tracks) {
+  const lines = ['#EXTM3U', ...tracks.flatMap((t) => [
+    `#EXTINF:${Math.round(t.result.duration)},${t.artist ? `${t.artist} - ` : ''}${t.title} [${t.result.key?.camelot} ${fmtBpm(t.result.bpm)}]`,
+    t.name,
+  ])];
+  exportText(lines.join('\n') + '\n', 'keymix-set.m3u', 'audio/x-mpegurl');
+}
+
+// ------------------------------------------------- Constructor de sets ----
+
+function setTracks() {
+  return state.set.map(byId).filter((t) => t?.result);
+}
+
+function buildSetNow() {
+  const src = $('#set-source').value === 'all' ? done() : done().filter((t) => state.checked.has(t.id));
+  if (src.length < 2) {
+    toast($('#set-source').value === 'all' ? 'Necesitas al menos 2 pistas analizadas' : 'Marca al menos 2 pistas en la biblioteca (o elige «Toda la biblioteca»)', 'error');
+    return;
+  }
+  const order = buildSet(src.filter((t) => t.result.key).map(asSetItem), $('#set-start').value || null);
+  state.set = order.map((o) => o.id);
+  save();
+  renderSet();
+}
+
+function renderSetStart() {
+  const sel = $('#set-start');
+  const cur = sel.value;
+  sel.replaceChildren(el('option', { value: '' }, 'La de menor energía'),
+    ...done().map((t) => el('option', { value: t.id, selected: t.id === cur }, `${keyText(t)} · ${t.title}`)));
+}
+
+function renderSet() {
+  renderSetStart();
+  const list = $('#set-list');
+  const tracks = setTracks();
+  const items = [];
+  tracks.forEach((t, i) => {
+    if (i > 0) {
+      const tr = describeTransition(asSetItem(tracks[i - 1]), asSetItem(t));
+      items.push(el('li', { class: 'transition' },
+        el('span', { class: `badge ${tr.type}` }, tr.label),
+        `Δ ${tr.bpmDelta}% BPM · energía ${tr.energyDelta > 0 ? '+' : ''}${tr.energyDelta}`));
+    }
+    const move = (d) => {
+      const j = i + d;
+      if (j < 0 || j >= state.set.length) return;
+      [state.set[i], state.set[j]] = [state.set[j], state.set[i]];
+      save();
+      renderSet();
+    };
+    items.push(el('li', { class: 'set-item' },
+      el('span', { class: 'idx' }, i + 1),
+      keyChip(t),
+      el('div', { style: 'min-width:0', onclick: () => select(t.id, true) },
+        el('div', { class: 't-title' }, t.title), el('div', { class: 't-artist' }, t.artist || t.name)),
+      el('span', { class: 's-bpm' }, `${fmtBpm(t.result.bpm)} BPM`),
+      el('span', { class: 's-energy' }, energyBar(t.result.energy)),
+      el('span', { class: 'set-actions' },
+        el('button', { title: 'Subir', onclick: () => move(-1) }, '↑'),
+        el('button', { title: 'Bajar', onclick: () => move(1) }, '↓'),
+        el('button', { title: 'Quitar del set', onclick: () => { state.set.splice(i, 1); save(); renderSet(); } }, '✕'))));
+  });
+  list.replaceChildren(...items);
+  if (!tracks.length) list.append(el('li', { class: 'muted', style: 'padding:24px 0' }, 'Marca pistas en la biblioteca y pulsa «Generar set armónico». El orden minimiza choques de tonalidad, saltos de tempo y caídas de energía.'));
+
+  const items2 = tracks.map(asSetItem);
+  const clashes = items2.slice(1).filter((x, i) => compatibility(items2[i].camelot, x.camelot).type === 'clash').length;
+  const total = tracks.reduce((a, t) => a + t.result.duration, 0);
+  $('#set-summary').textContent = tracks.length
+    ? `${tracks.length} pistas · ${fmtTime(total)} · ${clashes ? `${clashes} choque(s) armónico(s)` : 'sin choques armónicos'} · puntuación ${pathCost(items2).toFixed(1)} (menor es mejor)`
+    : '';
+
+  const svg = $('#energy-curve');
+  if (tracks.length > 1) {
+    const w = 1000;
+    const h = 70;
+    const pts = tracks.map((t, i) => `${(i / (tracks.length - 1)) * w},${h - 6 - ((t.result.energy - 1) / 9) * (h - 12)}`);
+    svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    svg.innerHTML = `<polyline points="${pts.join(' ')}" fill="none" stroke="var(--accent)" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`
+      + pts.map((p, i) => `<circle cx="${p.split(',')[0]}" cy="${p.split(',')[1]}" r="4" fill="${keyBg(camelotOf(tracks[i]))}" vector-effect="non-scaling-stroke"><title>${tracks[i].title.replace(/[<&]/g, '')} · E${tracks[i].result.energy}</title></circle>`).join('');
+    svg.style.display = '';
+  } else svg.style.display = 'none';
+}
+
+// -------------------------------------------------------- Reproductor ----
+
+const audio = $('#audio');
+let currentUrl = null;
+
+function loadIntoPlayer(t, autoplay = false) {
+  if (!t?.file) {
+    if (t) toast('Esta pista está en caché pero sin archivo: vuelve a añadirla para reproducirla', 'error');
+    return false;
+  }
+  if (isAiffName(t.name) && !t.playFile) {
+    toast('Preparando el AIFF para reproducirlo, vuelve a intentarlo en un momento');
+    preparePlayback(t);
+    return false;
+  }
+  if (state.playingId !== t.id) {
+    if (currentUrl) URL.revokeObjectURL(currentUrl);
+    currentUrl = URL.createObjectURL(t.playFile || t.file);
+    audio.src = currentUrl;
+    state.playingId = t.id;
+  }
+  if (autoplay) audio.play().catch(() => {});
+  renderPlayerInfo();
+  return true;
+}
+
+function playerTrack() {
+  return byId(state.playingId) || byId(state.selectedId);
+}
+
+function togglePlay() {
+  const sel = byId(state.selectedId);
+  if (sel && sel.id !== state.playingId) {
+    loadIntoPlayer(sel, true);
+    scheduleRender();
+    return;
+  }
+  if (!state.playingId) return;
+  if (audio.paused) audio.play().catch(() => {});
+  else audio.pause();
+}
+
+function jumpToCue(t, i) {
+  const cue = t.result?.cues[i];
+  if (!cue) return;
+  if (!loadIntoPlayer(t)) return;
+  const go = () => {
+    audio.currentTime = cue.time;
+    audio.play().catch(() => {});
+  };
+  if (audio.readyState >= 1) go();
+  else audio.addEventListener('loadedmetadata', go, { once: true });
+  scheduleRender();
+}
+
+function renderPlayerInfo() {
+  const t = playerTrack();
+  const keyBox = $('#np-key');
+  if (!t) {
+    keyBox.textContent = '—';
+    keyBox.style.background = '';
+    return;
+  }
+  $('#np-title').textContent = t.title;
+  $('#np-meta').textContent = t.result
+    ? `${t.artist ? `${t.artist} · ` : ''}${fmtBpm(t.result.bpm)} BPM · Energía ${t.result.energy}${t.file ? '' : ' · sin archivo'}`
+    : t.artist || t.name;
+  keyBox.textContent = t.result?.key ? keyText(t) : '—';
+  keyBox.style.background = t.result?.key ? keyBg(camelotOf(t)) : '';
+  const cues = t.result?.cues || [];
+  $('#cue-buttons').replaceChildren(...Array.from({ length: 8 }, (_, i) =>
+    el('button', {
+      style: `background:${CUE_COLORS[i]}`,
+      disabled: !cues[i],
+      title: cues[i] ? `${cues[i].label} · ${fmtTime(cues[i].time)} (tecla ${i + 1})` : 'Sin cue',
+      onclick: () => jumpToCue(t, i),
+    }, i + 1)));
+  $('#btn-play').textContent = audio.paused || state.playingId !== t.id ? '▶' : '⏸';
+  updateTime();
+}
+
+function updateTime() {
+  const t = playerTrack();
+  const dur = t?.result?.duration || audio.duration || 0;
+  const cur = state.playingId === t?.id ? audio.currentTime : 0;
+  $('#time').textContent = `${fmtTime(cur)} / ${fmtTime(dur)}`;
+}
+
+function drawWaveform() {
+  const canvas = $('#waveform');
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.max(1, Math.floor(canvas.clientWidth * dpr));
+  const h = Math.max(1, Math.floor(canvas.clientHeight * dpr));
+  if (canvas.width !== w) canvas.width = w;
+  if (canvas.height !== h) canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, w, h);
+  const t = playerTrack();
+  if (!t?.result) return;
+  const { peaks, low, mid, high } = t.result.waveform;
+  const dur = t.result.duration;
+  const pos = state.playingId === t.id ? audio.currentTime / dur : 0;
+  const cols = peaks.length;
+  const mid0 = h / 2;
+  const barW = Math.max(1, w / cols);
+
+  // Rejilla de frases (cada 8 compases).
+  const g = t.result.beatGrid;
+  if (g?.bpm) {
+    const phrase = (60 / g.bpm) * 32;
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+    for (let x = g.firstBeat + g.downbeat * (60 / g.bpm); x < dur; x += phrase) {
+      ctx.fillRect(Math.round((x / dur) * w), 0, 1, h);
+    }
+  }
+  for (let x = 0; x < w; x += barW) {
+    const c = Math.min(cols - 1, Math.floor((x / w) * cols));
+    const amp = (peaks[c] / 255) * (mid0 - 2);
+    const lo = low[c] / 255;
+    const md = mid[c] / 255;
+    const hi = high[c] / 255;
+    const r = Math.round(250 * lo + 70 * md + 110 * hi);
+    const gg = Math.round(70 * lo + 210 * md + 190 * hi);
+    const b = Math.round(90 * lo + 120 * md + 255 * hi);
+    const played = x / w <= pos;
+    ctx.fillStyle = `rgba(${r},${gg},${b},${played ? 1 : 0.55})`;
+    ctx.fillRect(x, mid0 - amp, Math.ceil(barW), amp * 2 || 1);
+  }
+  // Cue points.
+  ctx.font = `${10 * dpr}px system-ui, sans-serif`;
+  t.result.cues.forEach((cue, i) => {
+    const x = Math.round((cue.time / dur) * w);
+    ctx.fillStyle = CUE_COLORS[i];
+    ctx.fillRect(x, 0, Math.max(1, dpr), h);
+    ctx.fillRect(x, 0, 14 * dpr, 13 * dpr);
+    ctx.fillStyle = '#111';
+    ctx.fillText(String(i + 1), x + 4 * dpr, 10 * dpr);
+  });
+  // Cabezal.
+  if (state.playingId === t.id) {
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(Math.round(pos * w) - dpr, 0, 2 * dpr, h);
+  }
+}
+
+// ------------------------------------------------------------ Acciones ----
+
+function select(id, scroll = false) {
+  if (id !== state.selectedId) stopDrone();
+  state.selectedId = id;
+  if (state.view !== 'library' && scroll) switchView('library');
+  // Sin reconstruir la tabla: así las filas bajo el cursor siguen siendo las mismas entre clics.
+  if (state.compatOnly) renderTable();
+  else updateRowStates();
+  renderWheel();
+  renderDetails();
+  renderPlayerInfo();
+  if (state.view === 'set') renderSet();
+  drawWaveform();
+  if (scroll) document.querySelector(`tr[data-id="${id}"]`)?.scrollIntoView({ block: 'nearest' });
+}
+
+/** Actualiza selección, pista en reproducción y puntos de compatibilidad sin redibujar filas. */
+function updateRowStates() {
+  const sel = byId(state.selectedId);
+  document.querySelectorAll('#track-body tr[data-id]').forEach((tr) => {
+    const t = byId(tr.dataset.id);
+    tr.classList.toggle('selected', tr.dataset.id === state.selectedId);
+    tr.classList.toggle('playing', tr.dataset.id === state.playingId);
+    const title = tr.querySelector('.t-title');
+    title?.querySelector('.compat-dot')?.remove();
+    const rel = sel?.result && t?.result ? relation(sel, t) : null;
+    if (title && rel) title.prepend(el('span', { class: `compat-dot compat-${rel.type}`, title: rel.label }));
+  });
+}
+
+/** Carga la pista en el reproductor y la reproduce desde el principio. */
+function playFromStart(t) {
+  if (!t) return;
+  if (t.status !== 'done') {
+    toast('Espera a que termine el análisis de esta pista para reproducirla');
+    return;
+  }
+  if (!loadIntoPlayer(t)) return;
+  const go = () => {
+    audio.currentTime = 0;
+    audio.play().catch((err) => toast(`No se pudo reproducir: ${err.message}`, 'error'));
+  };
+  if (audio.readyState >= 1) go();
+  else audio.addEventListener('loadedmetadata', go, { once: true });
+  updateRowStates();
+  renderPlayerInfo();
+  drawWaveform();
+}
+
+function switchView(view) {
+  state.view = view;
+  document.querySelectorAll('.tab').forEach((b) => {
+    b.classList.toggle('active', b.dataset.view === view);
+    b.setAttribute('aria-selected', b.dataset.view === view);
+  });
+  $('#view-library').hidden = view !== 'library';
+  $('#view-set').hidden = view !== 'set';
+  render();
+}
+
+function moveSelection(d) {
+  const list = visibleTracks();
+  if (!list.length) return;
+  const i = list.findIndex((t) => t.id === state.selectedId);
+  const n = list[Math.max(0, Math.min(list.length - 1, i < 0 ? 0 : i + d))];
+  select(n.id, true);
+}
+
+let lastRowClick = { id: null, time: 0 };
+
+function bindEvents() {
+  $('#file-input').addEventListener('change', (e) => {
+    addFiles(e.target.files);
+    e.target.value = '';
+  });
+  if ('showDirectoryPicker' in window) {
+    $('#btn-folder').hidden = false;
+    $('#btn-folder').addEventListener('click', openFolder);
+  }
+
+  const notation = $('#notation');
+  notation.value = state.settings.notation;
+  notation.addEventListener('change', () => {
+    state.settings.notation = notation.value;
+    saveSettings();
+    render();
+  });
+
+  const menu = $('#export-menu');
+  $('#btn-export').addEventListener('click', (e) => {
+    e.stopPropagation();
+    menu.hidden = !menu.hidden;
+    $('#btn-export').setAttribute('aria-expanded', !menu.hidden);
+  });
+  document.addEventListener('click', () => { menu.hidden = true; });
+  menu.addEventListener('click', (e) => {
+    const action = e.target.dataset.export;
+    if (!action) return;
+    menu.hidden = true;
+    if ((action === 'csv' || action === 'json') && !done().length) return toast('La biblioteca está vacía', 'error');
+    if (action === 'csv') exportCsv(done(), 'keymix-biblioteca.csv');
+    if (action === 'json') exportJson();
+    if (action === 'rekordbox') exportRekordbox();
+    if (action === 'tag-all') tagAll();
+    if (action === 'copy-tagged') copyTaggedToFolder();
+    if (action === 'clear') confirmDialog('Vaciar biblioteca', 'Se borrarán los análisis guardados. Tus archivos no se tocan.', 'Vaciar', true).then((ok) => {
+      if (!ok) return;
+      queue.length = 0;
+      state.tracks = state.tracks.filter((t) => t.status === 'decoding' || t.status === 'analyzing');
+      state.set = [];
+      state.checked.clear();
+      state.selectedId = null;
+      audio.pause();
+      state.playingId = null;
+      save();
+      render();
+    });
+  });
+
+  document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => switchView(b.dataset.view)));
+
+  $('#search').addEventListener('input', (e) => {
+    state.search = e.target.value;
+    renderTable();
+  });
+  $('#compat-only').addEventListener('change', (e) => {
+    state.compatOnly = e.target.checked;
+    renderTable();
+  });
+  $('#key-filter-chip').addEventListener('click', () => {
+    state.keyFilter = null;
+    render();
+  });
+  $('#check-all').addEventListener('change', (e) => {
+    for (const t of visibleTracks()) {
+      if (e.target.checked && t.status === 'done') state.checked.add(t.id);
+      else state.checked.delete(t.id);
+    }
+    renderTable();
+  });
+
+  document.querySelectorAll('.tracks th[data-sort]').forEach((th) =>
+    th.addEventListener('click', () => {
+      const key = th.dataset.sort;
+      state.sort = { key, dir: state.sort.key === key ? -state.sort.dir : 1 };
+      renderTable();
+    }));
+
+  $('#track-body').addEventListener('click', (e) => {
+    const check = e.target.closest('[data-check]');
+    if (check) {
+      if (check.checked) state.checked.add(check.dataset.check);
+      else state.checked.delete(check.dataset.check);
+      renderTable();
+      return;
+    }
+    const tr = e.target.closest('tr[data-id]');
+    if (!tr) return;
+    const id = tr.dataset.id;
+    // Doble clic detectado por tiempo y pista: funciona aunque la fila se haya redibujado entre clics.
+    const now = performance.now();
+    const isDouble = lastRowClick.id === id && now - lastRowClick.time < 450;
+    lastRowClick = isDouble ? { id: null, time: 0 } : { id, time: now };
+    if (state.selectedId !== id) select(id);
+    if (isDouble) playFromStart(byId(id));
+  });
+  // Evita que el doble clic seleccione el texto de la fila.
+  $('#track-body').addEventListener('mousedown', (e) => {
+    if (e.detail > 1 && e.target.closest('tr[data-id]')) e.preventDefault();
+  });
+
+  $('#wheel').addEventListener('click', (e) => {
+    const seg = e.target.closest('[data-code]');
+    if (!seg) return;
+    state.keyFilter = state.keyFilter === seg.dataset.code ? null : seg.dataset.code;
+    if (state.view !== 'library') switchView('library');
+    else render();
+  });
+
+  $('#btn-build-set').addEventListener('click', buildSetNow);
+  $('#btn-set-m3u').addEventListener('click', () => (setTracks().length ? exportM3u(setTracks()) : toast('El set está vacío', 'error')));
+  $('#btn-set-csv').addEventListener('click', () => (setTracks().length ? exportCsv(setTracks(), 'keymix-set.csv') : toast('El set está vacío', 'error')));
+
+  // Reproductor
+  $('#btn-play').addEventListener('click', togglePlay);
+  $('#btn-start').addEventListener('click', () => { audio.currentTime = 0; });
+  const vol = $('#volume');
+  vol.value = state.settings.volume;
+  audio.volume = state.settings.volume;
+  vol.addEventListener('input', () => {
+    audio.volume = Number(vol.value);
+    state.settings.volume = audio.volume;
+    saveSettings();
+  });
+  audio.addEventListener('play', () => { renderPlayerInfo(); updateRowStates(); });
+  audio.addEventListener('pause', renderPlayerInfo);
+  audio.addEventListener('ended', renderPlayerInfo);
+  let raf = 0;
+  const tick = () => {
+    updateTime();
+    drawWaveform();
+    raf = audio.paused ? 0 : requestAnimationFrame(tick);
+  };
+  audio.addEventListener('play', () => { if (!raf) raf = requestAnimationFrame(tick); });
+  audio.addEventListener('seeked', () => { updateTime(); drawWaveform(); });
+  $('#waveform').addEventListener('click', (e) => {
+    const t = playerTrack();
+    if (!t?.result || !loadIntoPlayer(t)) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const target = ((e.clientX - rect.left) / rect.width) * t.result.duration;
+    const go = () => { audio.currentTime = target; drawWaveform(); updateTime(); };
+    if (audio.readyState >= 1) go();
+    else audio.addEventListener('loadedmetadata', go, { once: true });
+    scheduleRender();
+  });
+  window.addEventListener('resize', () => drawWaveform());
+  window.addEventListener('pagehide', flushSave);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) flushSave(); });
+
+  // Arrastrar y soltar
+  let dragDepth = 0;
+  const overlay = $('#drop-overlay');
+  window.addEventListener('dragenter', (e) => {
+    if (![...(e.dataTransfer?.types || [])].includes('Files')) return;
+    e.preventDefault();
+    dragDepth++;
+    overlay.hidden = false;
+  });
+  window.addEventListener('dragover', (e) => e.preventDefault());
+  window.addEventListener('dragleave', () => {
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (!dragDepth) overlay.hidden = true;
+  });
+  window.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    dragDepth = 0;
+    overlay.hidden = true;
+    const items = [...(e.dataTransfer?.items || [])];
+    const entries = items.map((i) => i.webkitGetAsEntry?.()).filter(Boolean);
+    if (entries.some((en) => en.isDirectory)) {
+      const files = [];
+      const walk = (entry) => new Promise((res) => {
+        if (entry.isFile) {
+          entry.file((f) => {
+            // fullPath = «/CarpetaArrastrada/sub/tema.aiff» → «sub/tema.aiff»
+            filePaths.set(f, entry.fullPath.split('/').filter(Boolean).slice(1).join('/') || f.name);
+            files.push(f);
+            res();
+          }, () => res());
+        }
+        else if (entry.isDirectory) {
+          const reader = entry.createReader();
+          const all = [];
+          const readBatch = () => reader.readEntries(async (batch) => {
+            if (!batch.length) { await Promise.all(all.map(walk)); res(); } else { all.push(...batch); readBatch(); }
+          }, () => res());
+          readBatch();
+        } else res();
+      });
+      await Promise.all(entries.map(walk));
+      addFiles(files);
+    } else addFiles(e.dataTransfer.files);
+  });
+
+  // Atajos de teclado
+  document.addEventListener('keydown', (e) => {
+    const typing = /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName) && e.target.type !== 'checkbox' && e.target.type !== 'range';
+    if (typing) {
+      if (e.key === 'Escape') e.target.blur();
+      return;
+    }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); moveSelection(1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); moveSelection(-1); }
+    else if (e.key === 'Enter') playFromStart(byId(state.selectedId)); else if (/^[1-8]$/.test(e.key)) {
+      const t = playerTrack();
+      if (t) jumpToCue(t, Number(e.key) - 1);
+    } else if (e.key === 'Home') audio.currentTime = 0;
+    else if (e.key === '/') { e.preventDefault(); $('#search').focus(); }
+    else if (e.key.toLowerCase() === 'a') $('#file-input').click();
+    else if (e.key.toLowerCase() === 't') {
+      const t = byId(state.selectedId);
+      if (t?.result?.key) toggleDrone(drone.code || t.result.key.camelot);
+    } else if (e.key.toLowerCase() === 'c') { const c = $('#compat-only'); c.checked = !c.checked; c.dispatchEvent(new Event('change')); }
+  });
+}
+
+function loadDemo() {
+  toast('Generando pistas de demostración…');
+  setTimeout(() => addFiles(makeDemoFiles()), 30);
+}
+
+// ---------------------------------------------------------------- Init ----
+
+load();
+$('#btn-demo').addEventListener('click', loadDemo);
+let firstVisit = true;
+try {
+  firstVisit = !localStorage.getItem('keymix.visited');
+  localStorage.setItem('keymix.visited', '1');
+} catch {
+  // sin almacenamiento: se trata como primera visita
+}
+if (!state.tracks.length && firstVisit) loadDemo();
+if (state.tracks.length) state.selectedId = state.tracks[0].id;
+bindEvents();
+render();
+
+return {  };
+})();
+
+})();
+
+</script>
+</body>
+</html>
