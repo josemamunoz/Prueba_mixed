@@ -51,6 +51,12 @@ Ningún detector acierta siempre, y cada programa (Beatport, Rekordbox, Mixed In
 3. Si es la correcta, el acorde se funde con la música y suena estable. Si no, notarás roces o un batido que ondula.
 4. Compara con las **alternativas** y la **relativa**. «Solo la tónica» ayuda a encontrar la nota central; «Acorde» ayuda a distinguir mayor de menor (8A frente a 8B).
 
+### Cue points en Rekordbox
+
+Rekordbox no lee cue points desde las etiquetas de los archivos: los importa desde un archivo **rekordbox XML**. En **Exportar → Para Rekordbox (XML con cue points)…** indica la carpeta donde están los archivos que vas a cargar (los originales o las copias etiquetadas) y guarda `keymix-rekordbox.xml`. Incluye hasta 8 hot cues (A–H) con su nombre y color, un memory cue en cada uno, la rejilla de beats, la tonalidad, el BPM y el comentario con la energía.
+
+En Rekordbox: **Preferencias → Avanzado → Base de datos → rekordbox xml → Biblioteca importada** y elige el XML. Activa la vista del árbol «rekordbox xml» (**Preferencias → Vista → Diseño**). En el panel izquierdo, abre **rekordbox xml → Todas las pistas**, selecciona las pistas y usa clic derecho → **Importar a la colección**.
+
 ## Cómo funciona
 
 Todo el análisis es JavaScript sin dependencias (`js/dsp.js`) y se ejecuta en Web Workers:
@@ -82,6 +88,7 @@ js/camelot.js       notaciones y reglas de mezcla armónica
 js/setbuilder.js    ordenación de sets
 js/id3.js           lectura y escritura de ID3v2.3/2.4
 js/aiff.js          decodificador AIFF/AIFF-C y codificador WAV
+js/rekordbox.js     exportación a rekordbox XML (cue points, rejilla, tonalidad)
 scripts/            CLI de análisis para WAV
 tests/              tests con audio sintético
 ```

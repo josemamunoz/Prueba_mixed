@@ -3,6 +3,7 @@ import { formatKey, keyColor, compatibility, fromCamelot, relativeCode, referenc
 import { readTags, writeTags, writeContainerTags, readContainerTags } from './id3.js';
 import { isAiff, parseAiff, encodeWav } from './aiff.js';
 import { makeDemoFiles } from './demo.js';
+import { buildRekordboxXml } from './rekordbox.js';
 import { buildSet, describeTransition, transitionCost, bpmDistance, pathCost } from './setbuilder.js';
 
 // ------------------------------------------------------------- Estado ----
@@ -36,6 +37,8 @@ const state = {
     volume: 0.9,
     droneMode: 'chord',
     droneVolume: 0.25,
+    rbBasePath: '',
+    rbBeatgrid: true,
   },
 };
 
@@ -92,7 +95,7 @@ const b64 = {
 function serializeTrack(t) {
   const r = t.result;
   return {
-    id: t.id, fileKey: t.fileKey, name: t.name, title: t.title, artist: t.artist, size: t.size, addedAt: t.addedAt, index: t.index,
+    id: t.id, fileKey: t.fileKey, name: t.name, relPath: t.relPath || null, title: t.title, artist: t.artist, size: t.size, addedAt: t.addedAt, index: t.index,
     result: { ...r, waveform: Object.fromEntries(Object.entries(r.waveform).map(([k, v]) => [k, b64.enc(v)])) },
   };
 }
@@ -312,6 +315,9 @@ function pump() {
   renderQueueStatus();
 }
 
+// Ruta relativa de cada archivo dentro de la carpeta abierta o arrastrada (para rekordbox XML).
+const filePaths = new WeakMap();
+
 function addFiles(files, handles = []) {
   const list = [...files].filter((f) => AUDIO_EXT.test(f.name) || f.type.startsWith('audio/'));
   if (!list.length) {
@@ -327,6 +333,7 @@ function addFiles(files, handles = []) {
       existing.file = file;
       existing.playFile = null;
       existing.handle = handles[i] || existing.handle;
+      existing.relPath = filePaths.get(file) || existing.relPath || null;
       preparePlayback(existing);
       if (existing.status === 'error') {
         existing.status = 'queued';
@@ -348,6 +355,7 @@ function addFiles(files, handles = []) {
       progress: 0,
       file,
       handle: handles[i] || null,
+      relPath: filePaths.get(file) || null,
       result: null,
     };
     state.tracks.push(t);
@@ -364,15 +372,17 @@ async function openFolder() {
     const dir = await window.showDirectoryPicker({ mode: 'readwrite' });
     const files = [];
     const handles = [];
-    async function walk(d, depth) {
+    async function walk(d, depth, prefix) {
       for await (const entry of d.values()) {
         if (entry.kind === 'file' && AUDIO_EXT.test(entry.name)) {
+          const file = await entry.getFile();
+          filePaths.set(file, prefix + entry.name);
           handles.push(entry);
-          files.push(await entry.getFile());
-        } else if (entry.kind === 'directory' && depth < 4) await walk(entry, depth + 1);
+          files.push(file);
+        } else if (entry.kind === 'directory' && depth < 4) await walk(entry, depth + 1, `${prefix}${entry.name}/`);
       }
     }
-    await walk(dir, 0);
+    await walk(dir, 0, '');
     addFiles(files, handles);
   } catch (err) {
     if (err.name !== 'AbortError') toast(`No se pudo abrir la carpeta: ${err.message}`, 'error');
@@ -1048,6 +1058,61 @@ async function copyTaggedToFolder(only = null) {
   if (failed.length) toast(`No se pudieron copiar ${failed.length}: ${failed.slice(0, 3).join(' · ')}`, 'error', 9000);
 }
 
+// --------------------------------------------------- Rekordbox XML ----
+
+async function exportRekordbox() {
+  const marked = done().filter((t) => state.checked.has(t.id));
+  const list = marked.length ? marked : done();
+  if (!list.length) return toast('La biblioteca está vacía', 'error');
+  const s = state.settings;
+  const hasSub = list.some((t) => t.relPath?.includes('/'));
+  const path = el('input', {
+    id: 'rb-path', type: 'text', value: s.rbBasePath || '', placeholder: 'F:\\06_Musica\\Etiquetadas',
+    style: 'width:100%;padding:7px 9px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text)',
+  });
+  const chk = (id, label, checked, note) => el('label', { style: 'display:flex;gap:8px;align-items:flex-start;font-size:13px' },
+    el('input', { type: 'checkbox', id, checked }), el('span', {}, label, note ? el('br') : null, note ? el('small', { class: 'muted' }, note) : null));
+  const body = el('div', { style: 'display:grid;gap:10px' },
+    el('p', {}, `Se exportarán ${list.length} ${marked.length ? 'pistas marcadas' : 'pistas'} con sus cue points, tonalidad, BPM y comentario.`),
+    el('label', { style: 'display:grid;gap:4px;font-size:13px' },
+      'Carpeta donde están los archivos que vas a cargar en Rekordbox (cópiala de la barra de direcciones del Explorador):', path),
+    hasSub ? chk('rb-sub', 'Respetar subcarpetas', true, 'Desmárcalo si los archivos están todos juntos, por ejemplo en la carpeta de copias etiquetadas.') : null,
+    chk('rb-prefix', 'Los nombres llevan el prefijo «8A - 124 - »', s.renamePrefix, 'Márcalo si copiaste las pistas con la opción «Añadir tonalidad y BPM al nombre».'),
+    chk('rb-grid', 'Incluir la rejilla de beats (BPM y primer tiempo)', s.rbBeatgrid !== false, 'Desmárcalo si prefieres que Rekordbox calcule su propia rejilla.'));
+  const ok = await openDialog('Exportar para Rekordbox (XML)', body, [
+    { label: 'Cancelar', value: false },
+    {
+      label: 'Crear XML', primary: true, action: (close) => {
+        if (!path.value.trim()) {
+          path.focus();
+          return toast('Escribe la carpeta donde están los archivos', 'error');
+        }
+        close(true);
+      },
+    },
+  ]);
+  if (!ok) return;
+  s.rbBasePath = path.value.trim().replace(/[\\/]+$/, '');
+  s.rbBeatgrid = body.querySelector('#rb-grid').checked;
+  saveSettings();
+  const usePrefix = body.querySelector('#rb-prefix').checked;
+  const useSub = hasSub ? body.querySelector('#rb-sub').checked : false;
+  const items = list.map((t) => {
+    const name = usePrefix ? `${tagKeyString(t)} - ${fmtBpm(Math.round(t.result.bpm))} - ${t.name}`.replace(/[\\/:*?"<>|]/g, '_') : t.name;
+    const rel = t.relPath ? t.relPath.replace(/[^/]+$/, name) : name;
+    return {
+      title: t.title, artist: t.artist, name, relPath: rel, size: t.size,
+      keyText: tagKeyString(t), comment: `${tagKeyString(t)} - Energy ${t.result.energy}`, result: t.result,
+    };
+  });
+  const pos = new Map(list.map((t, i) => [t.id, i]));
+  const playlists = [{ name: 'KeyMix Pro', ids: list.map((_, i) => i) }];
+  const setIdx = state.set.map((id) => pos.get(id)).filter((i) => i != null);
+  if (setIdx.length) playlists.push({ name: 'KeyMix Pro · Set armónico', ids: setIdx });
+  const xml = buildRekordboxXml(items, { basePath: s.rbBasePath, useSubfolders: useSub, cueColors: CUE_COLORS, playlists, beatgrid: s.rbBeatgrid });
+  exportText(xml, 'keymix-rekordbox.xml', 'application/xml');
+}
+
 // ------------------------------------------------------- Exportación ----
 
 function csvEscape(v) {
@@ -1407,6 +1472,7 @@ function bindEvents() {
     if ((action === 'csv' || action === 'json') && !done().length) return toast('La biblioteca está vacía', 'error');
     if (action === 'csv') exportCsv(done(), 'keymix-biblioteca.csv');
     if (action === 'json') exportJson();
+    if (action === 'rekordbox') exportRekordbox();
     if (action === 'tag-all') tagAll();
     if (action === 'copy-tagged') copyTaggedToFolder();
     if (action === 'clear') confirmDialog('Vaciar biblioteca', 'Se borrarán los análisis guardados. Tus archivos no se tocan.', 'Vaciar', true).then((ok) => {
@@ -1546,7 +1612,14 @@ function bindEvents() {
     if (entries.some((en) => en.isDirectory)) {
       const files = [];
       const walk = (entry) => new Promise((res) => {
-        if (entry.isFile) entry.file((f) => { files.push(f); res(); }, () => res());
+        if (entry.isFile) {
+          entry.file((f) => {
+            // fullPath = «/CarpetaArrastrada/sub/tema.aiff» → «sub/tema.aiff»
+            filePaths.set(f, entry.fullPath.split('/').filter(Boolean).slice(1).join('/') || f.name);
+            files.push(f);
+            res();
+          }, () => res());
+        }
         else if (entry.isDirectory) {
           const reader = entry.createReader();
           const all = [];
