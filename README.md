@@ -88,7 +88,7 @@ Todo el análisis es JavaScript sin dependencias (`js/dsp.js`) y se ejecuta en W
 
 ```bash
 npm test                                 # tests (Node ≥ 18; los de ID3 usan ffmpeg si está instalado)
-node scripts/analyze.mjs pista.wav ...   # analizar WAV desde la terminal
+node scripts/analyze.mjs pista.aiff ...  # analizar AIFF o WAV desde la terminal (--bpm 120 para fijar el tempo)
 ```
 
 Estructura:
