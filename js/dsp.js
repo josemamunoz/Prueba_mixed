@@ -5,6 +5,10 @@ import { camelotCode, openKeyCode, musicalName } from './camelot.js';
 
 export const ANALYSIS_SAMPLE_RATE = 22050;
 
+// Se incrementa cuando cambia el motor; los análisis anteriores se repiten al volver a añadir el archivo.
+// 2: tempo robusto frente a arpegios en corcheas con puntillo o tresillos.
+export const ANALYSIS_VERSION = 2;
+
 // ---------------------------------------------------------------- FFT ----
 
 const fftCache = new Map();
@@ -233,12 +237,40 @@ function estimateTempo(feat) {
   const Lc = (60 * fps) / coarse;
   if (coarse * 2 < MAX_BPM && interp(ac, Lc / 2) >= 0.75 * interp(ac, Lc)) coarse *= 2;
 
-  // Refinado con filtro peine sobre toda la pista.
+  // Señal de pulso: flujo espectral completo + bombo. En música de baile el bombo marca el tempo;
+  // sin él, un arpegio o delay en corcheas con puntillo (cada 3/4 de tiempo) engaña al detector
+  // y 120 BPM se lee como 160.
   const sm = smooth3(smooth3(odf));
-  let bestBpm = coarse;
+  const kick = smooth3(detrend(feat.lowOdf, fps));
+  const mSm = mean(sm) + 1e-9;
+  const mK = mean(kick) + 1e-9;
+  const inRange = (b) => b >= MIN_BPM && b < MAX_BPM;
+  const ratios = [1, 3 / 4, 2 / 3, 4 / 3, 3 / 2];
+  const cands = ratios.map((r) => coarse * r).filter(inRange);
+  const kickStrength = Math.max(...cands.map((b) => combScore(kick, (60 * fps) / b).score / mK));
+  const wK = kickStrength > 1.6 ? 1.5 : 0;
+  const pulse = new Float32Array(n);
+  for (let i = 0; i < n; i++) pulse[i] = sm[i] / mSm + (wK * kick[i]) / mK;
+
+  // Entre el candidato y sus relaciones de puntillo/tresillo, el que mejor encaja con el pulso.
+  let chosen = coarse;
+  let chosenScore = -Infinity;
+  for (const c of cands) {
+    let local = -Infinity;
+    for (let b = c - 1; b <= c + 1; b += 0.1) local = Math.max(local, combScore(pulse, (60 * fps) / b).score);
+    const prior = Math.exp(-0.5 * (Math.log2(c / 125) / 1.2) ** 2);
+    const sc = local * (0.92 + 0.08 * prior) * (c === coarse ? 1.02 : 1); // ligera preferencia por el original
+    if (sc > chosenScore) {
+      chosenScore = sc;
+      chosen = c;
+    }
+  }
+
+  // Refinado con filtro peine sobre toda la pista.
+  let bestBpm = chosen;
   let best = { score: -Infinity, phase: 0 };
-  for (let bpm = coarse - 1; bpm <= coarse + 1; bpm += 0.02) {
-    const r = combScore(sm, (60 * fps) / bpm, 0.5);
+  for (let bpm = chosen - 1; bpm <= chosen + 1; bpm += 0.02) {
+    const r = combScore(pulse, (60 * fps) / bpm, 0.5);
     if (r.score > best.score) {
       best = r;
       bestBpm = bpm;
@@ -247,7 +279,7 @@ function estimateTempo(feat) {
   // Preferir el entero cercano si puntúa casi igual (la mayoría de producciones usan BPM enteros).
   const rounded = Math.round(bestBpm);
   if (Math.abs(rounded - bestBpm) < 0.15) {
-    const r = combScore(sm, (60 * fps) / rounded, 0.5);
+    const r = combScore(pulse, (60 * fps) / rounded, 0.5);
     if (r.score >= best.score * 0.97) {
       best = r;
       bestBpm = rounded;
@@ -256,7 +288,6 @@ function estimateTempo(feat) {
   const period = (60 * fps) / bestBpm;
   const confidence = clamp01((combScore(sm, period, 0.5).score / (mean(sm) + 1e-9) - 1) / 3);
   // Fase: el bombo (flujo de graves) marca el tiempo mejor que los charles a contratiempo.
-  const kick = smooth3(detrend(feat.lowOdf, fps));
   const kickFit = combScore(kick, period, 0.25);
   const phase = kickFit.score / (mean(kick) + 1e-9) > 1.5 ? kickFit.phase : combScore(sm, period, 0.25).phase;
   return { bpm: Math.round(bestBpm * 100) / 100, period, phase, confidence };
@@ -638,7 +669,7 @@ export function analyzeTrack(samples, sampleRate = ANALYSIS_SAMPLE_RATE, onProgr
   const waveform = buildWaveform(samples, feat);
   onProgress(1, 'Listo');
   return {
-    version: 1,
+    version: ANALYSIS_VERSION,
     duration,
     bpm: tempo.bpm,
     bpmConfidence: Math.round(tempo.confidence * 100) / 100,

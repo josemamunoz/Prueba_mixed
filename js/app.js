@@ -1,4 +1,4 @@
-import { ANALYSIS_SAMPLE_RATE, energyFromFeatures } from './dsp.js';
+import { ANALYSIS_SAMPLE_RATE, ANALYSIS_VERSION, energyFromFeatures } from './dsp.js';
 import { formatKey, keyColor, compatibility, fromCamelot, relativeCode, referenceMidi } from './camelot.js';
 import { readTags, writeTags, writeContainerTags, readContainerTags } from './id3.js';
 import { isAiff, parseAiff, encodeWav } from './aiff.js';
@@ -325,6 +325,7 @@ function addFiles(files, handles = []) {
     return;
   }
   let cached = 0;
+  let reanalyzed = 0;
   list.forEach((file, i) => {
     const key = fileKey(file);
     const existing = state.tracks.find((t) => t.fileKey === key);
@@ -335,9 +336,12 @@ function addFiles(files, handles = []) {
       existing.handle = handles[i] || existing.handle;
       existing.relPath = filePaths.get(file) || existing.relPath || null;
       preparePlayback(existing);
-      if (existing.status === 'error') {
+      const outdated = existing.status === 'done' && existing.result?.version !== ANALYSIS_VERSION;
+      if (existing.status === 'error' || outdated) {
         existing.status = 'queued';
+        existing.progress = 0;
         queue.push(existing);
+        if (outdated) reanalyzed++;
       } else cached++;
       return;
     }
@@ -362,6 +366,7 @@ function addFiles(files, handles = []) {
     queue.push(t);
   });
   if (cached) toast(`${cached} pista(s) ya estaban analizadas: se han vuelto a vincular`);
+  if (reanalyzed) toast(`${reanalyzed} pista(s) analizadas con una versión anterior: se vuelven a analizar`);
   if (!state.selectedId && state.tracks.length) state.selectedId = state.tracks[0].id;
   pump();
   scheduleRender();
@@ -483,7 +488,12 @@ function keyChip(t, cls = '') {
 }
 
 function statusCell(t) {
-  if (t.status === 'done') return el('span', { class: 'status' }, t.file ? '✓ Analizada' : '✓ En caché');
+  if (t.status === 'done') {
+    if (t.result?.version !== ANALYSIS_VERSION) {
+      return el('span', { class: 'status', title: 'Analizada con una versión anterior. Vuelve a añadir el archivo para actualizar el análisis.' }, '↻ Análisis antiguo');
+    }
+    return el('span', { class: 'status' }, t.file ? '✓ Analizada' : '✓ En caché');
+  }
   if (t.status === 'error') return el('span', { class: 'status error', title: t.error }, `✕ ${t.error}`);
   const label = t.status === 'queued' ? 'En cola' : t.stage || 'Analizando';
   return el('div', {}, el('span', { class: 'status' }, label),

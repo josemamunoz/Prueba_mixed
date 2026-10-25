@@ -65,3 +65,24 @@ test('energía: referencia real de deep house (Frink - Deeply) da energía baja'
   const bright = energyFromFeatures({ loudnessDb: -8, onsetsPerSec: 7, centroidHz: 3000, fullness: 0.8, bpm: 130 });
   assert.ok(bright.level >= 7, `techno brillante: ${bright.level}`);
 });
+
+// Caso real: «Brann (AR) - Babylon» (120 BPM) se detectaba a 161 por un arpegio/delay en
+// corcheas con puntillo (una nota cada 3/4 de tiempo = pulso de 160 BPM).
+const ARP = [69, 72, 76, 81, 76, 72];
+
+test('arpegio en corcheas con puntillo no convierte 120 BPM en 160', () => {
+  for (const gain of [0.2, 0.5, 0.8]) {
+    const r = analyzeTrack(synthTrack({ bpm: 120, chords: A_MINOR, bass: A_MINOR_BASS, seconds: 60, arp: { everyBeats: 0.75, notes: ARP, gain } }));
+    assert.ok(Math.abs(r.bpm - 120) < 0.3, `arpegio ${gain}: bpm=${r.bpm}`);
+  }
+});
+
+test('arpegio en tresillos no altera el tempo (128 BPM)', () => {
+  const r = analyzeTrack(synthTrack({ bpm: 128, chords: A_MINOR, bass: A_MINOR_BASS, seconds: 60, arp: { everyBeats: 2 / 3, notes: ARP, gain: 0.5 } }));
+  assert.ok(Math.abs(r.bpm - 128) < 0.3, `bpm=${r.bpm}`);
+});
+
+test('una pista que de verdad va a 160 BPM sigue dando 160', () => {
+  const r = analyzeTrack(synthTrack({ bpm: 160, chords: A_MINOR, bass: A_MINOR_BASS, seconds: 60, arp: { everyBeats: 1, notes: ARP, gain: 0.4 } }));
+  assert.ok(Math.abs(r.bpm - 160) < 0.3, `bpm=${r.bpm}`);
+});
