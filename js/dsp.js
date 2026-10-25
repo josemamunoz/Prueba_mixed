@@ -7,7 +7,8 @@ export const ANALYSIS_SAMPLE_RATE = 22050;
 
 // Se incrementa cuando cambia el motor; los análisis anteriores se repiten al volver a añadir el archivo.
 // 2: tempo robusto frente a arpegios en corcheas con puntillo o tresillos.
-export const ANALYSIS_VERSION = 2;
+// 3: bombo medido solo donde suena (bombo suave o en parte del tema).
+export const ANALYSIS_VERSION = 3;
 
 // ---------------------------------------------------------------- FFT ----
 
@@ -153,7 +154,26 @@ const timeFrame = (feat, t) => (t * feat.sr - feat.frameSize / 2) / feat.hop;
 export const MIN_BPM = 80;
 export const MAX_BPM = 180;
 
-function combScore(sm, period, phaseStep = 1) {
+/** Zonas (bloques de ~4 s) donde suena el bombo: energía de graves ≥ 25 % del bloque más fuerte. */
+function kickActivity(kick, fps) {
+  const n = kick.length;
+  const W = Math.max(1, Math.round(fps * 4));
+  const blocks = [];
+  for (let i = 0; i < n; i += W) {
+    let e = 0;
+    for (let j = i; j < Math.min(n, i + W); j++) e += kick[j];
+    blocks.push(e / Math.min(W, n - i));
+  }
+  const maxE = Math.max(...blocks, 1e-12);
+  const active = new Uint8Array(n);
+  blocks.forEach((e, b) => {
+    if (e >= 0.25 * maxE) active.fill(1, b * W, Math.min(n, (b + 1) * W));
+  });
+  return active;
+}
+
+/** Puntuación del filtro peine; con `mask`, solo cuentan los instantes marcados. */
+function combScore(sm, period, phaseStep = 1, mask = null) {
   let best = -Infinity;
   let bestPhase = 0;
   const n = sm.length;
@@ -162,6 +182,7 @@ function combScore(sm, period, phaseStep = 1) {
     let c = 0;
     for (let t = ph; t < n - 1; t += period) {
       const i = t | 0;
+      if (mask && !mask[i]) continue;
       const fr = t - i;
       s += sm[i] * (1 - fr) + sm[i + 1] * fr;
       c++;
@@ -203,7 +224,7 @@ function mean(x) {
   return s / Math.max(1, x.length);
 }
 
-function estimateTempo(feat) {
+function estimateTempo(feat, bpmHint = null) {
   const fps = feat.fps;
   const odf = detrend(feat.odf, fps);
   const n = odf.length;
@@ -236,40 +257,56 @@ function estimateTempo(feat) {
   // (p. ej. drum & bass a 174 en lugar de 87).
   const Lc = (60 * fps) / coarse;
   if (coarse * 2 < MAX_BPM && interp(ac, Lc / 2) >= 0.75 * interp(ac, Lc)) coarse *= 2;
+  const autoCoarse = coarse;
+  // BPM indicado a mano: se refina solo alrededor de ese valor.
+  if (bpmHint) coarse = bpmHint;
 
   // Señal de pulso: flujo espectral completo + bombo. En música de baile el bombo marca el tempo;
   // sin él, un arpegio o delay en corcheas con puntillo (cada 3/4 de tiempo) engaña al detector
-  // y 120 BPM se lee como 160.
+  // y 120 BPM se lee como 160. El bombo se mide solo donde suena (intros y breaks sin bombo
+  // no lo diluyen) y su peso crece con lo claro que es.
   const sm = smooth3(smooth3(odf));
   const kick = smooth3(detrend(feat.lowOdf, fps));
+  const active = kickActivity(kick, fps);
   const mSm = mean(sm) + 1e-9;
-  const mK = mean(kick) + 1e-9;
+  let kSum = 0;
+  let kN = 0;
+  for (let i = 0; i < n; i++) if (active[i]) { kSum += kick[i]; kN++; }
+  const mK = kN ? kSum / kN + 1e-9 : 1;
   const inRange = (b) => b >= MIN_BPM && b < MAX_BPM;
   const ratios = [1, 3 / 4, 2 / 3, 4 / 3, 3 / 2];
-  const cands = ratios.map((r) => coarse * r).filter(inRange);
-  const kickStrength = Math.max(...cands.map((b) => combScore(kick, (60 * fps) / b).score / mK));
-  const wK = kickStrength > 1.6 ? 1.5 : 0;
+  const cands = bpmHint ? [coarse] : ratios.map((r) => coarse * r).filter(inRange);
+  const kickFitAt = (b) => combScore(kick, (60 * fps) / b, 1, active).score / mK;
+  const kickStrength = kN > fps * 8 ? Math.max(...cands.map(kickFitAt)) : 0;
+  const wK = 2 * clamp01((kickStrength - 1.15) / 0.6);
   const pulse = new Float32Array(n);
-  for (let i = 0; i < n; i++) pulse[i] = sm[i] / mSm + (wK * kick[i]) / mK;
+  for (let i = 0; i < n; i++) pulse[i] = sm[i] / mSm + (active[i] ? (wK * kick[i]) / mK : 0);
 
-  // Entre el candidato y sus relaciones de puntillo/tresillo, el que mejor encaja con el pulso.
+  // Entre el candidato y sus relaciones de puntillo/tresillo, el que mejor encaja.
   let chosen = coarse;
   let chosenScore = -Infinity;
+  const candInfo = [];
   for (const c of cands) {
     let local = -Infinity;
-    for (let b = c - 1; b <= c + 1; b += 0.1) local = Math.max(local, combScore(pulse, (60 * fps) / b).score);
+    for (let b = c - 1; b <= c + 1; b += 0.1) {
+      const P = (60 * fps) / b;
+      const sc = combScore(sm, P).score / mSm + (wK ? wK * (combScore(kick, P, 1, active).score / mK) : 0);
+      local = Math.max(local, sc);
+    }
     const prior = Math.exp(-0.5 * (Math.log2(c / 125) / 1.2) ** 2);
     const sc = local * (0.92 + 0.08 * prior) * (c === coarse ? 1.02 : 1); // ligera preferencia por el original
+    candInfo.push({ bpm: Math.round(c * 10) / 10, score: Math.round(sc * 100) / 100, kick: Math.round(kickFitAt(c) * 100) / 100 });
     if (sc > chosenScore) {
       chosenScore = sc;
       chosen = c;
     }
   }
 
-  // Refinado con filtro peine sobre toda la pista.
+  // Refinado con filtro peine sobre toda la pista (más estrecho si el BPM se indicó a mano).
   let bestBpm = chosen;
   let best = { score: -Infinity, phase: 0 };
-  for (let bpm = chosen - 1; bpm <= chosen + 1; bpm += 0.02) {
+  const span = bpmHint ? Math.max(0.3, bpmHint * 0.004) : 1;
+  for (let bpm = chosen - span; bpm <= chosen + span; bpm += 0.02) {
     const r = combScore(pulse, (60 * fps) / bpm, 0.5);
     if (r.score > best.score) {
       best = r;
@@ -288,9 +325,17 @@ function estimateTempo(feat) {
   const period = (60 * fps) / bestBpm;
   const confidence = clamp01((combScore(sm, period, 0.5).score / (mean(sm) + 1e-9) - 1) / 3);
   // Fase: el bombo (flujo de graves) marca el tiempo mejor que los charles a contratiempo.
-  const kickFit = combScore(kick, period, 0.25);
-  const phase = kickFit.score / (mean(kick) + 1e-9) > 1.5 ? kickFit.phase : combScore(sm, period, 0.25).phase;
-  return { bpm: Math.round(bestBpm * 100) / 100, period, phase, confidence };
+  const kickFit = combScore(kick, period, 0.25, active);
+  const phase = kN && kickFit.score / mK > 1.5 ? kickFit.phase : combScore(sm, period, 0.25).phase;
+  const info = {
+    auto: Math.round(autoCoarse * 100) / 100,
+    hint: bpmHint || null,
+    candidates: candInfo,
+    kickStrength: Math.round(kickStrength * 100) / 100,
+    kickWeight: Math.round(wK * 100) / 100,
+    kickActivePct: Math.round((kN / n) * 100),
+  };
+  return { bpm: Math.round(bestBpm * 100) / 100, period, phase, confidence, info };
 }
 
 // --------------------------------------------------------- Tonalidad ----
@@ -653,13 +698,13 @@ function buildWaveform(x, feat, cols = 1000) {
 /**
  * Analiza una señal mono (Float32Array) y devuelve tonalidad, BPM, energía, cues y forma de onda.
  */
-export function analyzeTrack(samples, sampleRate = ANALYSIS_SAMPLE_RATE, onProgress = () => {}) {
+export function analyzeTrack(samples, sampleRate = ANALYSIS_SAMPLE_RATE, onProgress = () => {}, options = {}) {
   if (samples.length < sampleRate * 3) throw new Error('El audio es demasiado corto (mínimo 3 segundos).');
   const duration = samples.length / sampleRate;
   onProgress(0.01, 'Extrayendo características');
   const feat = shortTimeFeatures(samples, sampleRate, (p) => onProgress(0.01 + p * 0.39, 'Extrayendo características'));
   onProgress(0.4, 'Detectando tempo');
-  const tempo = estimateTempo(feat);
+  const tempo = estimateTempo(feat, options.bpmHint || null);
   onProgress(0.5, 'Detectando tonalidad');
   const key = estimateKey(samples, sampleRate, (p) => onProgress(0.5 + p * 0.4, 'Detectando tonalidad'));
   onProgress(0.92, 'Calculando energía y cue points');
@@ -673,6 +718,7 @@ export function analyzeTrack(samples, sampleRate = ANALYSIS_SAMPLE_RATE, onProgr
     duration,
     bpm: tempo.bpm,
     bpmConfidence: Math.round(tempo.confidence * 100) / 100,
+    tempoInfo: tempo.info,
     key: key && {
       tonic: key.tonic,
       mode: key.mode,

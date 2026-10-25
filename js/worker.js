@@ -2,7 +2,7 @@
 import { analyzeTrack } from './dsp.js';
 
 self.onmessage = (e) => {
-  const { id, samples, sampleRate } = e.data;
+  const { id, samples, sampleRate, options } = e.data;
   let lastSent = -1;
   try {
     const result = analyzeTrack(samples, sampleRate, (progress, stage) => {
@@ -10,7 +10,7 @@ self.onmessage = (e) => {
         lastSent = progress;
         self.postMessage({ id, type: 'progress', progress, stage });
       }
-    });
+    }, options || {});
     const w = result.waveform;
     self.postMessage({ id, type: 'done', result }, [w.peaks.buffer, w.low.buffer, w.mid.buffer, w.high.buffer]);
   } catch (err) {

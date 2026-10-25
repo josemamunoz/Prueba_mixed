@@ -326,6 +326,14 @@ table.tracks { width: 100%; border-collapse: collapse; }
 .drone-help ol { margin: 6px 0; padding-left: 18px; display: grid; gap: 4px; }
 .drone-help p { margin: 4px 0 0; }
 
+.tempo-box { display: grid; gap: 8px; margin-bottom: 6px; font-size: 12px; }
+.tempo-ratios { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.btn.small { padding: 3px 8px; font-size: 12px; border-radius: 6px; }
+.tempo-manual { display: inline-flex; gap: 4px; }
+.tempo-manual input { width: 72px; padding: 3px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+.linklike { border: 0; background: none; color: var(--accent-2); cursor: pointer; padding: 0; text-decoration: underline; }
+.tempo-box ul { margin: 4px 0; padding-left: 18px; }
+
 /* ---------- Constructor de sets ---------- */
 .set-summary { padding: 10px 16px 0; color: var(--muted); font-size: 13px; }
 .energy-curve { width: calc(100% - 32px); height: 70px; margin: 8px 16px 0; flex-shrink: 0; }

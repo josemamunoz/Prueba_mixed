@@ -8,10 +8,10 @@ const freq = (midi) => 440 * 2 ** ((midi - 69) / 12);
  * sections: opcional, [{ fromBar, toBar, gain, kick }] para crear breaks.
  */
 /**
- * arp: opcional, { everyBeats, notes, gain } — notas cortas y brillantes cada `everyBeats` tiempos
+ * arp: opcional, { everyBeats, notes, gain, attack } — notas cortas y brillantes cada `everyBeats` tiempos
  * (0.75 = corcheas con puntillo, típico del delay en melodic/progressive house).
  */
-export function synthTrack({ bpm, chords, bass, seconds = 40, sr = 22050, sections = [], arp = null }) {
+export function synthTrack({ bpm, chords, bass, seconds = 40, sr = 22050, sections = [], arp = null, kickGain = 1 }) {
   const n = Math.floor(seconds * sr);
   const out = new Float32Array(n);
   const beat = 60 / bpm;
@@ -34,7 +34,7 @@ export function synthTrack({ bpm, chords, bass, seconds = 40, sr = 22050, sectio
     if (sec.kick) {
       const tb = t % beat;
       const env = Math.exp(-tb * 30);
-      s += 0.6 * env * Math.sin(2 * Math.PI * (50 + 100 * Math.exp(-tb * 40)) * tb);
+      s += 0.6 * kickGain * env * Math.sin(2 * Math.PI * (50 + 100 * Math.exp(-tb * 40)) * tb);
       const th = (t + beat / 2) % beat; // charles a contratiempo
       s += 0.05 * Math.exp(-th * 80) * (Math.sin(t * 52000) * Math.sin(t * 31337));
     }
@@ -43,7 +43,8 @@ export function synthTrack({ bpm, chords, bass, seconds = 40, sr = 22050, sectio
       const k = Math.floor(t / step);
       const ta = t - k * step;
       const f = freq(arp.notes[k % arp.notes.length]);
-      const env = Math.exp(-ta * 9);
+      // attack (s): 0 = ataque seco con clic (caso difícil); 0.004 = pluck realista.
+      const env = (arp.attack ? Math.min(1, ta / arp.attack) : 1) * Math.exp(-ta * 9);
       s += arp.gain * env * (Math.sin(2 * Math.PI * f * ta) + 0.5 * Math.sin(4 * Math.PI * f * ta) + 0.3 * Math.sin(6 * Math.PI * f * ta));
     }
     out[i] = s * sec.gain;

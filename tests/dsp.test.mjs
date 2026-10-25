@@ -86,3 +86,23 @@ test('una pista que de verdad va a 160 BPM sigue dando 160', () => {
   const r = analyzeTrack(synthTrack({ bpm: 160, chords: A_MINOR, bass: A_MINOR_BASS, seconds: 60, arp: { everyBeats: 1, notes: ARP, gain: 0.4 } }));
   assert.ok(Math.abs(r.bpm - 160) < 0.3, `bpm=${r.bpm}`);
 });
+
+test('bombo suave con arpegio de ataque seco: sigue en 120', () => {
+  const r = analyzeTrack(synthTrack({ bpm: 120, chords: A_MINOR, bass: A_MINOR_BASS, seconds: 60, kickGain: 0.2, arp: { everyBeats: 0.75, notes: ARP, gain: 0.5 } }));
+  assert.ok(Math.abs(r.bpm - 120) < 0.3, `bpm=${r.bpm}`);
+});
+
+test('BPM indicado a mano: se respeta y la rejilla y los cues se calculan con él', () => {
+  // Caso que el detector automático aún confunde (bombo solo en parte del tema + arpegio seco).
+  const x = synthTrack({
+    bpm: 120, chords: A_MINOR, bass: A_MINOR_BASS, seconds: 112, arp: { everyBeats: 0.75, notes: ARP, gain: 0.5 },
+    sections: [{ fromBar: 0, toBar: 16, gain: 0.8, kick: false }, { fromBar: 40, toBar: 99, gain: 0.8, kick: false }],
+  });
+  const r = analyzeTrack(x, undefined, undefined, { bpmHint: 120 });
+  assert.equal(r.bpm, 120);
+  assert.equal(r.tempoInfo.hint, 120);
+  assert.equal(r.beatGrid.bpm, 120);
+  const bar = 2;
+  assert.ok(r.cues.some((c) => Math.abs(c.time - 16 * bar) < 0.6), `cues: ${JSON.stringify(r.cues)}`);
+  assert.ok(r.tempoInfo.candidates.length >= 1);
+});

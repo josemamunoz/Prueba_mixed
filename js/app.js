@@ -95,7 +95,7 @@ const b64 = {
 function serializeTrack(t) {
   const r = t.result;
   return {
-    id: t.id, fileKey: t.fileKey, name: t.name, relPath: t.relPath || null, title: t.title, artist: t.artist, size: t.size, addedAt: t.addedAt, index: t.index,
+    id: t.id, fileKey: t.fileKey, name: t.name, relPath: t.relPath || null, bpmHint: t.bpmHint || null, needsReanalysis: !!t.needsReanalysis, title: t.title, artist: t.artist, size: t.size, addedAt: t.addedAt, index: t.index,
     result: { ...r, waveform: Object.fromEntries(Object.entries(r.waveform).map(([k, v]) => [k, b64.enc(v)])) },
   };
 }
@@ -179,7 +179,7 @@ function getWorker() {
   return w;
 }
 
-function analyzeInWorker(samples, onProgress) {
+function analyzeInWorker(samples, onProgress, options = {}) {
   return new Promise((resolve, reject) => {
     const w = getWorker();
     const id = uid();
@@ -197,7 +197,7 @@ function analyzeInWorker(samples, onProgress) {
       w.busy = false;
       reject(new Error(e.message || 'Error en el worker'));
     };
-    w.worker.postMessage({ id, samples, sampleRate: ANALYSIS_SAMPLE_RATE }, [samples.buffer]);
+    w.worker.postMessage({ id, samples, sampleRate: ANALYSIS_SAMPLE_RATE, options }, [samples.buffer]);
   });
 }
 
@@ -285,7 +285,8 @@ async function processTrack(t) {
       t.progress = p;
       t.stage = stage;
       scheduleRender(true);
-    });
+    }, { bpmHint: t.bpmHint || null });
+    t.needsReanalysis = false;
     t.status = 'done';
     t.progress = 1;
     save();
@@ -360,7 +361,7 @@ function addFiles(files, handles = []) {
       existing.handle = handles[i] || existing.handle;
       existing.relPath = filePaths.get(file) || existing.relPath || null;
       preparePlayback(existing);
-      const outdated = existing.status === 'done' && existing.result?.version !== ANALYSIS_VERSION;
+      const outdated = existing.status === 'done' && (existing.result?.version !== ANALYSIS_VERSION || existing.needsReanalysis);
       if (existing.status === 'error' || outdated) {
         existing.status = 'queued';
         existing.progress = 0;
@@ -513,7 +514,7 @@ function keyChip(t, cls = '') {
 
 function statusCell(t) {
   if (t.status === 'done') {
-    if (t.result?.version !== ANALYSIS_VERSION) {
+    if (t.result?.version !== ANALYSIS_VERSION || t.needsReanalysis) {
       return el('span', { class: 'status', title: 'Analizada con una versión anterior. Vuelve a añadir el archivo para actualizar el análisis.' }, '↻ Análisis antiguo');
     }
     return el('span', { class: 'status' }, t.file ? '✓ Analizada' : '✓ En caché');
@@ -736,6 +737,8 @@ function renderDetails() {
       el('div', { class: 'stat' }, el('div', { class: 'v' }, r.energy), el('div', { class: 'l' }, 'Energía')),
       el('div', { class: 'stat' }, el('div', { class: 'v' }, fmtTime(r.duration)), el('div', { class: 'l' }, 'Duración'))),
     energyBar(r.energy),
+    el('div', { class: 'section-title' }, 'Tempo'),
+    tempoBox(t),
     el('div', { class: 'section-title' }, 'Perfil tonal (cromagrama)'),
     el('div', { class: 'chroma' }, (k?.chroma || []).map((v, i) =>
       el('div', { class: i === tonicPc ? 'tonic' : '', style: `height:${Math.max(3, v * 100)}%`, title: `${PITCHES[i]}: ${Math.round(v * 100)}%` }))),
@@ -889,6 +892,70 @@ function droneBox(t) {
         el('li', {}, 'Si es la correcta, el acorde se funde con la canción y suena estable, «en casa». Si no lo es, notarás roces, tensión o un batido que ondula.'),
         el('li', {}, 'Pulsa las otras opciones para comparar y quédate con la que mejor encaje. Vuelve a pulsar para apagar.')),
       el('p', {}, 'Consejo: «Solo la tónica» ayuda a encontrar la nota central; «Acorde» ayuda a distinguir mayor de menor, por ejemplo 8A frente a 8B, que comparten las mismas notas.')));
+}
+
+// -------------------------------------------------- Corrección de tempo ----
+
+function setBpmHint(t, bpm) {
+  t.bpmHint = bpm ? Math.round(bpm * 100) / 100 : null;
+  if (t.file) {
+    reanalyze([t]);
+  } else {
+    t.needsReanalysis = true;
+    save();
+    toast('Guardado. Vuelve a añadir el archivo («Añadir pistas» o «Abrir carpeta») y se analizará con este tempo.', 'info', 7000);
+    renderDetails();
+    renderTable();
+  }
+}
+
+function tempoDiagnostic(t) {
+  const r = t.result;
+  return [
+    `Pista: ${t.artist ? `${t.artist} - ` : ''}${t.title} (${t.name})`,
+    `Duración: ${fmtTime(r.duration)} · BPM: ${r.bpm} · Confianza: ${r.bpmConfidence}`,
+    `Tonalidad: ${r.key?.camelot ?? '?'} · Energía: ${r.energy} · Versión del análisis: ${r.version}`,
+    `Tempo: ${JSON.stringify(r.tempoInfo || null)}`,
+    `Energía: ${JSON.stringify(r.energyDetail ? { ...r.energyDetail, weights: undefined } : null)}`,
+    `Cues: ${r.cues.map((c) => `${c.label}@${c.time}`).join(', ')}`,
+  ].join('\n');
+}
+
+function tempoBox(t) {
+  const r = t.result;
+  const info = r.tempoInfo;
+  const ratios = [['×½', 0.5], ['×⅔', 2 / 3], ['×¾', 0.75], ['×4/3', 4 / 3], ['×3/2', 1.5], ['×2', 2]];
+  const input = el('input', { id: 'bpm-input', type: 'number', min: 40, max: 250, step: 0.01, placeholder: 'BPM', value: '' });
+  const apply = () => {
+    const v = Number(input.value);
+    if (!(v >= 40 && v <= 250)) return toast('Escribe un BPM entre 40 y 250', 'error');
+    setBpmHint(t, v);
+  };
+  return el('div', { class: 'tempo-box' },
+    el('div', { class: 'tempo-state' }, t.bpmHint
+      ? el('span', {}, `Tempo fijado a mano (${fmtBpm(t.bpmHint)}). `, el('button', { class: 'linklike', onclick: () => setBpmHint(t, null) }, 'Volver al automático'))
+      : el('span', { class: 'muted' }, '¿El BPM no es correcto? Corrígelo y la pista se vuelve a analizar con ese tempo (rejilla y cue points incluidos).')),
+    el('div', { class: 'tempo-ratios' },
+      ratios.map(([label, k]) => el('button', {
+        class: 'btn small', title: `Fijar ${fmtBpm(Math.round(r.bpm * k * 100) / 100)} BPM`,
+        onclick: () => setBpmHint(t, r.bpm * k),
+      }, `${label} → ${fmtBpm(Math.round(r.bpm * k * 10) / 10)}`)),
+      el('span', { class: 'tempo-manual' }, input,
+        el('button', { class: 'btn small', onclick: apply }, 'Fijar'))),
+    el('details', { class: 'drone-help' },
+      el('summary', {}, 'Diagnóstico del tempo'),
+      info ? el('div', {},
+        el('p', {}, `Candidatos considerados (mayor puntuación gana; «bombo» indica lo bien que encaja con el bombo):`),
+        el('ul', {}, info.candidates.map((c) => el('li', {}, `${c.bpm} BPM · puntuación ${c.score} · bombo ${c.kick}`))),
+        el('p', {}, `Fuerza del bombo ${info.kickStrength} · peso ${info.kickWeight} · bombo presente en ${info.kickActivePct} % de la pista`))
+        : el('p', {}, 'Vuelve a analizar la pista para ver el diagnóstico.'),
+      el('button', {
+        class: 'btn small',
+        onclick: () => {
+          const txt = tempoDiagnostic(t);
+          navigator.clipboard.writeText(txt).then(() => toast('Diagnóstico copiado: pégalo en el chat'), () => exportText(txt, 'diagnostico-tempo.txt', 'text/plain'));
+        },
+      }, 'Copiar diagnóstico')));
 }
 
 // -------------------------------------------------------- Etiquetas ----

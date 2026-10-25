@@ -53,6 +53,10 @@ Arrastra archivos o carpetas a la ventana, o usa «Añadir pistas». Acepta MP3,
 | C | Activar o desactivar «Solo compatibles» |
 | A | Añadir archivos |
 
+### Corregir el BPM
+
+Si el BPM detectado no es el correcto (por ejemplo 160 en lugar de 120, típico de temas con arpegios o delays en corcheas con puntillo), en el panel de la pista, sección **Tempo**, pulsa la relación adecuada (×½, ×⅔, ×¾, ×4/3, ×3/2, ×2) o escribe el valor y pulsa **Fijar**. La pista se vuelve a analizar con ese tempo, así que la rejilla y los cue points se recalculan. **Volver al automático** deshace la corrección. **Diagnóstico del tempo → Copiar diagnóstico** copia los datos del análisis para informar de un fallo.
+
 ### Comprobar la tonalidad a oído
 
 Ningún detector acierta siempre, y cada programa (Beatport, Rekordbox, Mixed In Key) puede dar una tonalidad distinta. En el panel de cada pista, **«Comprobar a oído»** toca un acorde suave encima de la canción:
