@@ -299,6 +299,30 @@ async function processTrack(t) {
   scheduleRender();
 }
 
+/**
+ * Repite el análisis de las pistas indicadas (necesitan su archivo vinculado).
+ * Devuelve cuántas se pusieron en cola.
+ */
+function reanalyze(tracks) {
+  const withFile = tracks.filter((t) => t.file && (t.status === 'done' || t.status === 'error'));
+  const missing = tracks.filter((t) => !t.file).length;
+  for (const t of withFile) {
+    t.status = 'queued';
+    t.progress = 0;
+    t.error = null;
+    queue.push(t);
+  }
+  if (withFile.length) {
+    toast(`Analizando de nuevo ${withFile.length} pista(s)…`);
+    pump();
+    scheduleRender();
+  }
+  if (missing) {
+    toast(`${missing} pista(s) no tienen el archivo vinculado: vuelve a añadirlas con «Añadir pistas» o «Abrir carpeta» y se analizarán de nuevo si hace falta`, 'error', 8000);
+  }
+  return withFile.length;
+}
+
 function pump() {
   while (active < MAX_WORKERS && queue.length) {
     const t = queue.shift();
@@ -722,6 +746,12 @@ function renderDetails() {
     suggList,
     el('div', { class: 'section-title' }, 'Escribir etiquetas (MP3, AIFF, WAV)'),
     tagBox,
+    el('button', {
+      class: 'btn', style: 'margin-top:12px',
+      title: t.file ? 'Repite el análisis de tonalidad, BPM, energía y cue points' : 'Vuelve a añadir el archivo para poder analizarlo de nuevo',
+      disabled: !t.file,
+      onclick: () => reanalyze([t]),
+    }, '↻ Volver a analizar esta pista'),
     el('div', { class: 'section-title' }, 'Cómo se calculó la energía'),
     energyBreakdown(r),
   );
@@ -1485,6 +1515,14 @@ function bindEvents() {
     if (action === 'rekordbox') exportRekordbox();
     if (action === 'tag-all') tagAll();
     if (action === 'copy-tagged') copyTaggedToFolder();
+    if (action === 'reanalyze') {
+      const marked = done().filter((t) => state.checked.has(t.id));
+      const list = marked.length ? marked : state.tracks.filter((t) => t.status === 'done' || t.status === 'error');
+      if (!list.length) return toast('La biblioteca está vacía', 'error');
+      confirmDialog('Volver a analizar',
+        `Se analizarán de nuevo ${list.length} ${marked.length ? 'pistas marcadas' : 'pistas (toda la biblioteca)'}. Los cue points, la tonalidad y el BPM se recalculan.`,
+        'Analizar').then((ok) => ok && reanalyze(list));
+    }
     if (action === 'clear') confirmDialog('Vaciar biblioteca', 'Se borrarán los análisis guardados. Tus archivos no se tocan.', 'Vaciar', true).then((ok) => {
       if (!ok) return;
       queue.length = 0;
