@@ -35,7 +35,7 @@ print(t.get('Name')); print(t.get('Artist')); print(t.get('Location')); print(t.
 print(root.find('COLLECTION/TRACK/TEMPO').get('Inizio'))
 for m in t.findall('POSITION_MARK'): print(m.get('Name'), m.get('Start'), m.get('Num'), m.get('Red'))
 print(root.find('PLAYLISTS/NODE/NODE').get('Name'), root.find('PLAYLISTS/NODE/NODE/TRACK').get('Key'))
-`], { input: xml }).toString().trim().split('\n');
+`], { input: xml }).toString().trim().split(/\r?\n/); // Python en Windows escribe CRLF
   assert.deepEqual(out, [
     'Deeply "Original" <Mix>', 'Frink & Co', 'file://localhost/F:/Musica/House/Frink%20-%20Deeply.aiff', '8A', '124.00',
     '0.534',
