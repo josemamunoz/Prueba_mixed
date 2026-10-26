@@ -945,8 +945,8 @@ function tempoBox(t) {
     el('details', { class: 'drone-help' },
       el('summary', {}, 'Diagnóstico del tempo'),
       info ? el('div', {},
-        el('p', {}, `Candidatos considerados (mayor puntuación gana; «bombo» indica lo bien que encaja con el bombo):`),
-        el('ul', {}, info.candidates.map((c) => el('li', {}, `${c.bpm} BPM · puntuación ${c.score} · bombo ${c.kick}`))),
+        el('p', {}, `Candidatos considerados (mayor puntuación gana; «bombo» indica lo bien que encaja con el bombo; «autocorrelación», la periodicidad en ese tempo respecto al mejor candidato):`),
+        el('ul', {}, info.candidates.map((c) => el('li', {}, `${c.bpm} BPM · puntuación ${c.score} · bombo ${c.kick}${c.ac != null ? ` · autocorrelación ${c.ac}` : ''}`))),
         el('p', {}, `Fuerza del bombo ${info.kickStrength} · peso ${info.kickWeight} · bombo presente en ${info.kickActivePct} % de la pista`))
         : el('p', {}, 'Vuelve a analizar la pista para ver el diagnóstico.'),
       el('button', {

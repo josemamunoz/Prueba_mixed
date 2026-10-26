@@ -8,7 +8,8 @@ export const ANALYSIS_SAMPLE_RATE = 22050;
 // Se incrementa cuando cambia el motor; los análisis anteriores se repiten al volver a añadir el archivo.
 // 2: tempo robusto frente a arpegios en corcheas con puntillo o tresillos.
 // 3: bombo medido solo donde suena (bombo suave o en parte del tema).
-export const ANALYSIS_VERSION = 3;
+// 4: candidatos sin autocorrelación en su periodo penalizados (arpegio con puntillo, bombo débil).
+export const ANALYSIS_VERSION = 4;
 
 // ---------------------------------------------------------------- FFT ----
 
@@ -283,6 +284,11 @@ function estimateTempo(feat, bpmHint = null) {
   for (let i = 0; i < n; i++) pulse[i] = sm[i] / mSm + (active[i] ? (wK * kick[i]) / mK : 0);
 
   // Entre el candidato y sus relaciones de puntillo/tresillo, el que mejor encaja.
+  // El filtro peine puede premiar un arpegio en corcheas con puntillo aunque la autocorrelación
+  // en ese periodo sea casi nula (120 BPM leído como 160): se penaliza el candidato cuya
+  // autocorrelación no llega al 30 % de la del mejor candidato.
+  const acAt = (b) => Math.max(0, interp(ac, (60 * fps) / b));
+  const acMax = Math.max(1e-9, ...cands.map(acAt));
   let chosen = coarse;
   let chosenScore = -Infinity;
   const candInfo = [];
@@ -294,8 +300,9 @@ function estimateTempo(feat, bpmHint = null) {
       local = Math.max(local, sc);
     }
     const prior = Math.exp(-0.5 * (Math.log2(c / 125) / 1.2) ** 2);
-    const sc = local * (0.92 + 0.08 * prior) * (c === coarse ? 1.02 : 1); // ligera preferencia por el original
-    candInfo.push({ bpm: Math.round(c * 10) / 10, score: Math.round(sc * 100) / 100, kick: Math.round(kickFitAt(c) * 100) / 100 });
+    const acRel = acAt(c) / acMax;
+    const sc = local * (0.92 + 0.08 * prior) * (0.8 + 0.2 * clamp01(acRel / 0.3)) * (c === coarse ? 1.02 : 1); // ligera preferencia por el original
+    candInfo.push({ bpm: Math.round(c * 10) / 10, score: Math.round(sc * 100) / 100, kick: Math.round(kickFitAt(c) * 100) / 100, ac: Math.round(acRel * 100) / 100 });
     if (sc > chosenScore) {
       chosenScore = sc;
       chosen = c;
