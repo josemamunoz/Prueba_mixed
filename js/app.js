@@ -301,12 +301,13 @@ async function processTrack(t) {
 }
 
 /**
- * Repite el análisis de las pistas indicadas (necesitan su archivo vinculado).
- * Devuelve cuántas se pusieron en cola.
+ * Repite el análisis de las pistas indicadas. Las que no tienen el archivo vinculado (tras
+ * reabrir la app) quedan marcadas y se ofrece elegir la carpeta o los archivos para vincularlas;
+ * al volver a añadirlas se analizan de nuevo. Devuelve cuántas se pusieron en cola.
  */
 function reanalyze(tracks) {
   const withFile = tracks.filter((t) => t.file && (t.status === 'done' || t.status === 'error'));
-  const missing = tracks.filter((t) => !t.file).length;
+  const missing = tracks.filter((t) => !t.file);
   for (const t of withFile) {
     t.status = 'queued';
     t.progress = 0;
@@ -318,10 +319,35 @@ function reanalyze(tracks) {
     pump();
     scheduleRender();
   }
-  if (missing) {
-    toast(`${missing} pista(s) no tienen el archivo vinculado: vuelve a añadirlas con «Añadir pistas» o «Abrir carpeta» y se analizarán de nuevo si hace falta`, 'error', 8000);
+  if (missing.length) {
+    for (const t of missing) t.needsReanalysis = true;
+    save();
+    scheduleRender();
+    const canFolder = 'showDirectoryPicker' in window;
+    openDialog('Vincular archivos',
+      el('p', {}, `${missing.length} pista(s) no tienen el archivo vinculado (el navegador no lo conserva al cerrar la app). `
+        + `Elige ${canFolder ? 'la carpeta donde están o ' : ''}los archivos y se analizarán de nuevo. Si lo dejas para más tarde, se analizarán cuando las vuelvas a añadir.`),
+      [
+        { label: 'Más tarde', value: false },
+        { label: 'Elegir archivos…', value: 'files', primary: !canFolder },
+        ...(canFolder ? [{ label: 'Abrir carpeta…', value: 'folder', primary: true }] : []),
+      ]).then((choice) => {
+      if (choice === 'folder') openFolder();
+      if (choice === 'files') $('#file-input').click();
+    });
   }
   return withFile.length;
+}
+
+/** Vuelve a analizar las pistas marcadas o, si no hay ninguna marcada, toda la biblioteca. */
+function reanalyzeMarkedOrAll() {
+  const analyzed = state.tracks.filter((t) => t.status === 'done' || t.status === 'error');
+  const marked = analyzed.filter((t) => state.checked.has(t.id));
+  const list = marked.length ? marked : analyzed;
+  if (!list.length) return toast('No hay pistas analizadas', 'error');
+  confirmDialog('Volver a analizar',
+    `Se analizarán de nuevo ${list.length} ${marked.length ? 'pistas marcadas' : 'pistas (toda la biblioteca)'}. Los cue points, la tonalidad y el BPM se recalculan.`,
+    'Analizar').then((ok) => ok && reanalyze(list));
 }
 
 function pump() {
@@ -553,6 +579,9 @@ function renderTable() {
   $('#track-count').textContent = state.tracks.length
     ? `${list.length} de ${state.tracks.length} pistas${state.checked.size ? ` · ${state.checked.size} marcadas` : ''}`
     : '';
+  const nMarked = state.tracks.filter((t) => state.checked.has(t.id)).length;
+  $('#btn-reanalyze').textContent = nMarked ? `↻ Volver a analizar (${nMarked})` : '↻ Volver a analizar todas';
+  $('#btn-reanalyze').disabled = !state.tracks.length;
   document.querySelectorAll('.tracks th[data-sort]').forEach((th) => {
     th.classList.toggle('sorted', th.dataset.sort === state.sort.key);
     th.classList.toggle('desc', th.dataset.sort === state.sort.key && state.sort.dir < 0);
@@ -751,8 +780,8 @@ function renderDetails() {
     tagBox,
     el('button', {
       class: 'btn', style: 'margin-top:12px',
-      title: t.file ? 'Repite el análisis de tonalidad, BPM, energía y cue points' : 'Vuelve a añadir el archivo para poder analizarlo de nuevo',
-      disabled: !t.file,
+      title: t.file ? 'Repite el análisis de tonalidad, BPM, energía y cue points' : 'Pide el archivo para vincularlo y lo analiza de nuevo',
+      disabled: t.status === 'queued' || t.status === 'analyzing' || t.status === 'decoding',
       onclick: () => reanalyze([t]),
     }, '↻ Volver a analizar esta pista'),
     el('div', { class: 'section-title' }, 'Cómo se calculó la energía'),
@@ -1556,6 +1585,7 @@ function bindEvents() {
     $('#btn-folder').hidden = false;
     $('#btn-folder').addEventListener('click', openFolder);
   }
+  $('#btn-reanalyze').addEventListener('click', reanalyzeMarkedOrAll);
 
   const notation = $('#notation');
   notation.value = state.settings.notation;
@@ -1582,14 +1612,6 @@ function bindEvents() {
     if (action === 'rekordbox') exportRekordbox();
     if (action === 'tag-all') tagAll();
     if (action === 'copy-tagged') copyTaggedToFolder();
-    if (action === 'reanalyze') {
-      const marked = done().filter((t) => state.checked.has(t.id));
-      const list = marked.length ? marked : state.tracks.filter((t) => t.status === 'done' || t.status === 'error');
-      if (!list.length) return toast('La biblioteca está vacía', 'error');
-      confirmDialog('Volver a analizar',
-        `Se analizarán de nuevo ${list.length} ${marked.length ? 'pistas marcadas' : 'pistas (toda la biblioteca)'}. Los cue points, la tonalidad y el BPM se recalculan.`,
-        'Analizar').then((ok) => ok && reanalyze(list));
-    }
     if (action === 'clear') confirmDialog('Vaciar biblioteca', 'Se borrarán los análisis guardados. Tus archivos no se tocan.', 'Vaciar', true).then((ok) => {
       if (!ok) return;
       queue.length = 0;
