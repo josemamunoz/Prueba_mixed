@@ -354,14 +354,34 @@ function askForFiles(count) {
   });
 }
 
-/** Vuelve a analizar las pistas marcadas o, si no hay ninguna marcada, toda la biblioteca. */
-function reanalyzeMarkedOrAll() {
+/**
+ * Pistas que analiza el botón «Volver a analizar»: las marcadas; si no hay ninguna marcada, la
+ * seleccionada; si tampoco hay selección, toda la biblioteca.
+ */
+function reanalyzeTarget() {
   const analyzed = state.tracks.filter((t) => t.status === 'done' || t.status === 'error');
   const marked = analyzed.filter((t) => state.checked.has(t.id));
-  const list = marked.length ? marked : analyzed;
+  if (marked.length) return { list: marked, scope: 'marked' };
+  const selected = analyzed.find((t) => t.id === state.selectedId);
+  if (selected) return { list: [selected], scope: 'selected' };
+  return { list: analyzed, scope: 'all' };
+}
+
+function renderReanalyzeButton() {
+  const { list, scope } = reanalyzeTarget();
+  const btn = $('#btn-reanalyze');
+  btn.textContent = scope === 'marked' ? `↻ Volver a analizar (${list.length})`
+    : scope === 'selected' ? '↻ Volver a analizar seleccionada' : '↻ Volver a analizar todas';
+  btn.disabled = !list.length;
+}
+
+function reanalyzeMarkedOrAll() {
+  const { list, scope } = reanalyzeTarget();
   if (!list.length) return toast('No hay pistas analizadas', 'error');
+  const what = scope === 'marked' ? `${list.length} pistas marcadas`
+    : scope === 'selected' ? `«${list[0].title}»` : `${list.length} pistas (toda la biblioteca)`;
   confirmDialog('Volver a analizar',
-    `Se analizarán de nuevo ${list.length} ${marked.length ? 'pistas marcadas' : 'pistas (toda la biblioteca)'}. Los cue points, la tonalidad y el BPM se recalculan.`,
+    `Se analizará de nuevo ${what}. Los cue points, la tonalidad y el BPM se recalculan.`,
     'Analizar').then((ok) => ok && reanalyze(list));
 }
 
@@ -738,8 +758,7 @@ function renderTable() {
     ? `${list.length} de ${state.tracks.length} pistas${state.checked.size ? ` · ${state.checked.size} marcadas` : ''}`
     : '';
   const nMarked = state.tracks.filter((t) => state.checked.has(t.id)).length;
-  $('#btn-reanalyze').textContent = nMarked ? `↻ Volver a analizar (${nMarked})` : '↻ Volver a analizar todas';
-  $('#btn-reanalyze').disabled = !state.tracks.length;
+  renderReanalyzeButton();
   $('#btn-remove').hidden = !nMarked;
   $('#btn-remove').textContent = `🗑 Eliminar marcadas (${nMarked})`;
   renderRelinkBanner();
@@ -1703,6 +1722,7 @@ function updateRowStates() {
     const rel = sel?.result && t?.result ? relation(sel, t) : null;
     if (title && rel) title.prepend(el('span', { class: `compat-dot compat-${rel.type}`, title: rel.label }));
   });
+  renderReanalyzeButton();
 }
 
 /** Carga la pista en el reproductor y la reproduce desde el principio. */
@@ -1959,6 +1979,7 @@ function bindEvents() {
     } else if (e.key === 'Home') audio.currentTime = 0;
     else if (e.key === '/') { e.preventDefault(); $('#search').focus(); }
     else if (e.key === 'Delete') removeMarkedOrSelected();
+    else if (e.key === 'Escape' && state.selectedId) select(null);
     else if (e.key.toLowerCase() === 'a') $('#file-input').click();
     else if (e.key.toLowerCase() === 't') {
       const t = byId(state.selectedId);

@@ -17,7 +17,7 @@ Además incluye:
 - **Reproductor** con forma de onda coloreada por frecuencias, marcas de frase, cabezal y botones de cue 1–8.
 - **Biblioteca persistente**: los análisis se guardan en el navegador. Si vuelves a añadir un archivo ya analizado, se reutiliza el resultado al instante.
 - **Carpetas recordadas** (Chrome y Edge): las carpetas abiertas con **Abrir carpeta** se recuerdan y, al reabrir la app, sus archivos se vuelven a vincular solos. Si el navegador vuelve a pedir permiso, aparece un aviso con **Reconectar** (elige «Permitir en cada visita» para no tener que hacerlo más). Los archivos añadidos con **Añadir pistas** no se pueden recordar. **Vaciar biblioteca** también olvida las carpetas.
-- **Volver a analizar**: el botón **↻ Volver a analizar** de la barra superior repite el análisis de las pistas marcadas o, si no hay ninguna marcada, de toda la biblioteca; el panel de cada pista tiene su propio botón. Las pistas sin archivo vinculado se buscan primero en las carpetas recordadas; si no están, se pide la carpeta o los archivos.
+- **Volver a analizar**: el botón **↻ Volver a analizar** de la barra superior repite el análisis de las pistas marcadas; si no hay ninguna marcada, el de la seleccionada, y si tampoco hay selección (Esc la quita), el de toda la biblioteca. La etiqueta del botón indica cuál de los tres hará; el panel de cada pista tiene su propio botón. Las pistas sin archivo vinculado se buscan primero en las carpetas recordadas; si no están, se pide la carpeta o los archivos.
 - **Eliminar de la biblioteca**: al marcar pistas aparece **🗑 Eliminar marcadas** en la barra superior; el panel de cada pista tiene **🗑 Eliminar de la biblioteca**, y la tecla Supr quita las marcadas o, si no hay ninguna, la seleccionada. Siempre pide confirmación y solo borra el análisis guardado: los archivos no se tocan.
 - Exportación de la biblioteca a CSV o JSON.
 
@@ -56,6 +56,7 @@ Arrastra archivos o carpetas a la ventana, o usa «Añadir pistas». Acepta MP3,
 | C | Activar o desactivar «Solo compatibles» |
 | A | Añadir archivos |
 | Supr | Eliminar de la biblioteca las pistas marcadas o la seleccionada |
+| Esc | Quitar la selección |
 
 ### Corregir el BPM
 
