@@ -148,6 +148,14 @@ select {
   padding: 10px 16px;
   border-bottom: 1px solid var(--line);
 }
+.relink-banner {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-3);
+  font-size: 13px;
+}
+.relink-banner[hidden] { display: none; }
 #search {
   flex: 1 1 240px;
   max-width: 420px;

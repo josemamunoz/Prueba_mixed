@@ -16,7 +16,8 @@ Además incluye:
 - **Copias etiquetadas en otra carpeta** (Exportar → «Copiar etiquetadas a otra carpeta…»): deja intactos los originales y escribe copias etiquetadas, en el mismo formato y sin pérdida, en la carpeta que elijas (Chrome/Edge). Usa las pistas marcadas o, si no hay ninguna, toda la biblioteca. Nunca sobrescribe: si el nombre ya existe, guarda «nombre (2)».
 - **Reproductor** con forma de onda coloreada por frecuencias, marcas de frase, cabezal y botones de cue 1–8.
 - **Biblioteca persistente**: los análisis se guardan en el navegador. Si vuelves a añadir un archivo ya analizado, se reutiliza el resultado al instante.
-- **Volver a analizar**: el botón **↻ Volver a analizar** de la barra superior repite el análisis de las pistas marcadas o, si no hay ninguna marcada, de toda la biblioteca; el panel de cada pista tiene su propio botón. Tras reabrir la app el navegador ya no conserva los archivos, así que se pide la carpeta o los archivos para vincularlos y analizarlos.
+- **Carpetas recordadas** (Chrome y Edge): las carpetas abiertas con **Abrir carpeta** se recuerdan y, al reabrir la app, sus archivos se vuelven a vincular solos. Si el navegador vuelve a pedir permiso, aparece un aviso con **Reconectar** (elige «Permitir en cada visita» para no tener que hacerlo más). Los archivos añadidos con **Añadir pistas** no se pueden recordar. **Vaciar biblioteca** también olvida las carpetas.
+- **Volver a analizar**: el botón **↻ Volver a analizar** de la barra superior repite el análisis de las pistas marcadas o, si no hay ninguna marcada, de toda la biblioteca; el panel de cada pista tiene su propio botón. Las pistas sin archivo vinculado se buscan primero en las carpetas recordadas; si no están, se pide la carpeta o los archivos.
 - Exportación de la biblioteca a CSV o JSON.
 
 ## Uso sin servidor (doble clic)

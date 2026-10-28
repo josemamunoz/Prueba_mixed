@@ -21,6 +21,8 @@ const state = {
   selectedId: null,
   playingId: null,
   checked: new Set(),
+  folders: [], // handles de las carpetas abiertas, recordadas en IndexedDB
+  foldersLocked: [], // carpetas recordadas cuyo permiso hay que volver a pedir
   sort: { key: 'index', dir: 1 },
   search: '',
   compatOnly: false,
@@ -323,20 +325,33 @@ function reanalyze(tracks) {
     for (const t of missing) t.needsReanalysis = true;
     save();
     scheduleRender();
-    const canFolder = 'showDirectoryPicker' in window;
-    openDialog('Vincular archivos',
-      el('p', {}, `${missing.length} pista(s) no tienen el archivo vinculado (el navegador no lo conserva al cerrar la app). `
-        + `Elige ${canFolder ? 'la carpeta donde están o ' : ''}los archivos y se analizarán de nuevo. Si lo dejas para más tarde, se analizarán cuando las vuelvas a añadir.`),
-      [
-        { label: 'Más tarde', value: false },
-        { label: 'Elegir archivos…', value: 'files', primary: !canFolder },
-        ...(canFolder ? [{ label: 'Abrir carpeta…', value: 'folder', primary: true }] : []),
-      ]).then((choice) => {
-      if (choice === 'folder') openFolder();
-      if (choice === 'files') $('#file-input').click();
+    // Primero las carpetas recordadas: al vincularse, las pistas marcadas se analizan solas.
+    const relinked = state.folders.length ? relinkFolders({ ask: true }) : Promise.resolve(0);
+    relinked.then(() => {
+      const still = missing.filter((t) => !t.file).length;
+      if (still) askForFiles(still);
     });
   }
   return withFile.length;
+}
+
+/** Pide la carpeta o los archivos de las pistas que no se encontraron en las carpetas recordadas. */
+function askForFiles(count) {
+  const canFolder = 'showDirectoryPicker' in window;
+  const remembered = state.folders.length
+    ? `No están en las carpetas recordadas (${folderNames(state.folders)}). `
+    : `El navegador no conserva los archivos al cerrar la app${canFolder ? ', pero sí las carpetas abiertas con «Abrir carpeta»' : ''}. `;
+  openDialog('Vincular archivos',
+    el('p', {}, `${count} pista(s) no tienen el archivo vinculado. ${remembered}`
+      + `Elige ${canFolder ? 'la carpeta donde están o ' : ''}los archivos y se analizarán de nuevo. Si lo dejas para más tarde, se analizarán cuando las vuelvas a añadir.`),
+    [
+      { label: 'Más tarde', value: false },
+      { label: 'Elegir archivos…', value: 'files', primary: !canFolder },
+      ...(canFolder ? [{ label: 'Abrir carpeta…', value: 'folder', primary: true }] : []),
+    ]).then((choice) => {
+    if (choice === 'folder') openFolder();
+    if (choice === 'files') $('#file-input').click();
+  });
 }
 
 /** Vuelve a analizar las pistas marcadas o, si no hay ninguna marcada, toda la biblioteca. */
@@ -369,22 +384,31 @@ function pump() {
 // Ruta relativa de cada archivo dentro de la carpeta abierta o arrastrada (para rekordbox XML).
 const filePaths = new WeakMap();
 
-function addFiles(files, handles = []) {
-  const list = [...files].filter((f) => AUDIO_EXT.test(f.name) || f.type.startsWith('audio/'));
+/**
+ * Añade archivos a la biblioteca o vuelve a vincular los que ya estaban analizados.
+ * Con `relinkOnly` solo vincula pistas existentes (no añade archivos nuevos ni avisa).
+ * Devuelve cuántas pistas existentes se vincularon.
+ */
+function addFiles(files, handles = [], { relinkOnly = false } = {}) {
+  let list = [...files].map((file, i) => ({ file, handle: handles[i] || null }))
+    .filter(({ file }) => AUDIO_EXT.test(file.name) || file.type.startsWith('audio/'));
+  if (relinkOnly) list = list.filter(({ file }) => state.tracks.some((t) => t.fileKey === fileKey(file) && !t.file));
   if (!list.length) {
-    toast('No se encontraron archivos de audio', 'error');
-    return;
+    if (!relinkOnly) toast('No se encontraron archivos de audio', 'error');
+    return 0;
   }
   let cached = 0;
   let reanalyzed = 0;
-  list.forEach((file, i) => {
+  let linked = 0;
+  list.forEach(({ file, handle }) => {
     const key = fileKey(file);
     const existing = state.tracks.find((t) => t.fileKey === key);
     if (existing) {
       // Ya analizada: solo se vuelve a vincular el archivo (para reproducir/etiquetar).
       existing.file = file;
       existing.playFile = null;
-      existing.handle = handles[i] || existing.handle;
+      existing.handle = handle || existing.handle;
+      linked++;
       existing.relPath = filePaths.get(file) || existing.relPath || null;
       preparePlayback(existing);
       const outdated = existing.status === 'done' && (existing.result?.version !== ANALYSIS_VERSION || existing.needsReanalysis);
@@ -409,40 +433,142 @@ function addFiles(files, handles = []) {
       status: 'queued',
       progress: 0,
       file,
-      handle: handles[i] || null,
+      handle,
       relPath: filePaths.get(file) || null,
       result: null,
     };
     state.tracks.push(t);
     queue.push(t);
   });
-  if (cached) toast(`${cached} pista(s) ya estaban analizadas: se han vuelto a vincular`);
+  if (cached && !relinkOnly) toast(`${cached} pista(s) ya estaban analizadas: se han vuelto a vincular`);
   if (reanalyzed) toast(`${reanalyzed} pista(s) analizadas con una versión anterior: se vuelven a analizar`);
   if (!state.selectedId && state.tracks.length) state.selectedId = state.tracks[0].id;
   pump();
   scheduleRender();
+  return linked;
+}
+
+/** Lee los archivos de audio de una carpeta (hasta 4 niveles de subcarpetas). */
+async function readFolder(dir) {
+  const files = [];
+  const handles = [];
+  async function walk(d, depth, prefix) {
+    for await (const entry of d.values()) {
+      if (entry.kind === 'file' && AUDIO_EXT.test(entry.name)) {
+        const file = await entry.getFile();
+        filePaths.set(file, prefix + entry.name);
+        handles.push(entry);
+        files.push(file);
+      } else if (entry.kind === 'directory' && depth < 4) await walk(entry, depth + 1, `${prefix}${entry.name}/`);
+    }
+  }
+  await walk(dir, 0, '');
+  return { files, handles };
 }
 
 async function openFolder() {
   try {
     const dir = await window.showDirectoryPicker({ mode: 'readwrite' });
-    const files = [];
-    const handles = [];
-    async function walk(d, depth, prefix) {
-      for await (const entry of d.values()) {
-        if (entry.kind === 'file' && AUDIO_EXT.test(entry.name)) {
-          const file = await entry.getFile();
-          filePaths.set(file, prefix + entry.name);
-          handles.push(entry);
-          files.push(file);
-        } else if (entry.kind === 'directory' && depth < 4) await walk(entry, depth + 1, `${prefix}${entry.name}/`);
-      }
-    }
-    await walk(dir, 0, '');
+    const { files, handles } = await readFolder(dir);
     addFiles(files, handles);
+    rememberFolder(dir);
   } catch (err) {
     if (err.name !== 'AbortError') toast(`No se pudo abrir la carpeta: ${err.message}`, 'error');
   }
+}
+
+// ------------------------------------------------ Carpetas recordadas ----
+// Los handles de las carpetas abiertas se guardan en IndexedDB (localStorage solo admite texto)
+// para volver a vincular los archivos al reabrir la app sin elegir la carpeta otra vez.
+// Si el navegador ya no concede el permiso, basta un clic en «Reconectar» para pedirlo.
+
+const FOLDERS_DB = 'keymix';
+const FOLDERS_STORE = 'folders';
+
+function foldersTx(mode, fn) {
+  return new Promise((resolve, reject) => {
+    const open = indexedDB.open(FOLDERS_DB, 1);
+    open.onupgradeneeded = () => open.result.createObjectStore(FOLDERS_STORE);
+    open.onerror = () => reject(open.error);
+    open.onsuccess = () => {
+      const db = open.result;
+      const tx = db.transaction(FOLDERS_STORE, mode);
+      const req = fn(tx.objectStore(FOLDERS_STORE));
+      tx.oncomplete = () => { db.close(); resolve(req?.result); };
+      tx.onerror = () => { db.close(); reject(tx.error); };
+    };
+  });
+}
+
+async function loadFolders() {
+  try {
+    state.folders = (await foldersTx('readonly', (s) => s.getAll())) || [];
+  } catch (err) {
+    console.warn('No se pudieron leer las carpetas recordadas', err);
+    state.folders = [];
+  }
+}
+
+async function rememberFolder(dir) {
+  try {
+    for (const d of state.folders) if (await d.isSameEntry(dir)) return;
+    state.folders.push(dir);
+    await foldersTx('readwrite', (s) => s.put(dir, `${dir.name}|${Date.now()}`));
+  } catch (err) {
+    console.warn('No se pudo recordar la carpeta', err);
+  }
+}
+
+function forgetFolders() {
+  state.folders = [];
+  state.foldersLocked = [];
+  foldersTx('readwrite', (s) => s.clear()).catch((err) => console.warn('No se pudieron olvidar las carpetas', err));
+}
+
+const folderNames = (dirs) => dirs.map((d) => `«${d.name}»`).join(', ');
+
+/**
+ * Vuelve a vincular las pistas sin archivo con las carpetas recordadas. Con `ask` pide el
+ * permiso que falte (necesita un clic del usuario). Devuelve cuántas pistas se vincularon.
+ */
+async function relinkFolders({ ask = false } = {}) {
+  const granted = [];
+  const locked = [];
+  // Primero los permisos (pedirlos tras leer carpetas grandes podría perder el gesto del clic).
+  for (const dir of state.folders) {
+    try {
+      let p = await dir.queryPermission({ mode: 'readwrite' });
+      if (p !== 'granted' && ask) p = await dir.requestPermission({ mode: 'readwrite' });
+      (p === 'granted' ? granted : locked).push(dir);
+    } catch (err) {
+      console.warn(`Carpeta «${dir.name}» no disponible`, err);
+    }
+  }
+  state.foldersLocked = locked;
+  let linked = 0;
+  for (const dir of granted) {
+    if (!state.tracks.some((t) => t.status === 'done' && !t.file)) break;
+    try {
+      const { files, handles } = await readFolder(dir);
+      linked += addFiles(files, handles, { relinkOnly: true });
+    } catch (err) {
+      console.warn(`No se pudo leer la carpeta «${dir.name}»`, err);
+    }
+  }
+  if (linked) toast(`${linked} pista(s) vinculadas de nuevo desde ${folderNames(granted)}`);
+  scheduleRender();
+  return linked;
+}
+
+/** Aviso con el botón «Reconectar» cuando hay pistas sin archivo y el navegador pide permiso. */
+function renderRelinkBanner() {
+  const banner = $('#relink-banner');
+  const missing = state.tracks.filter((t) => t.status === 'done' && !t.file).length;
+  banner.hidden = !(missing && state.foldersLocked.length);
+  if (banner.hidden) return;
+  banner.replaceChildren(
+    el('span', {}, `${missing} pista(s) sin archivo vinculado. Están en ${folderNames(state.foldersLocked)}: `),
+    el('button', { class: 'btn small primary', onclick: () => relinkFolders({ ask: true }) }, 'Reconectar'));
 }
 
 // --------------------------------------------------------- Consultas ----
@@ -582,6 +708,7 @@ function renderTable() {
   const nMarked = state.tracks.filter((t) => state.checked.has(t.id)).length;
   $('#btn-reanalyze').textContent = nMarked ? `↻ Volver a analizar (${nMarked})` : '↻ Volver a analizar todas';
   $('#btn-reanalyze').disabled = !state.tracks.length;
+  renderRelinkBanner();
   document.querySelectorAll('.tracks th[data-sort]').forEach((th) => {
     th.classList.toggle('sorted', th.dataset.sort === state.sort.key);
     th.classList.toggle('desc', th.dataset.sort === state.sort.key && state.sort.dir < 0);
@@ -1612,9 +1739,10 @@ function bindEvents() {
     if (action === 'rekordbox') exportRekordbox();
     if (action === 'tag-all') tagAll();
     if (action === 'copy-tagged') copyTaggedToFolder();
-    if (action === 'clear') confirmDialog('Vaciar biblioteca', 'Se borrarán los análisis guardados. Tus archivos no se tocan.', 'Vaciar', true).then((ok) => {
+    if (action === 'clear') confirmDialog('Vaciar biblioteca', 'Se borrarán los análisis guardados y las carpetas recordadas. Tus archivos no se tocan.', 'Vaciar', true).then((ok) => {
       if (!ok) return;
       queue.length = 0;
+      forgetFolders();
       state.tracks = state.tracks.filter((t) => t.status === 'decoding' || t.status === 'analyzing');
       state.set = [];
       state.checked.clear();
@@ -1815,3 +1943,6 @@ if (!state.tracks.length && firstVisit) loadDemo();
 if (state.tracks.length) state.selectedId = state.tracks[0].id;
 bindEvents();
 render();
+// Al abrir: vincula de nuevo los archivos desde las carpetas recordadas si el permiso sigue
+// concedido; si no, el aviso «Reconectar» lo pide con un clic.
+loadFolders().then(() => relinkFolders());
