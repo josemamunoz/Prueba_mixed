@@ -9,7 +9,8 @@ export const ANALYSIS_SAMPLE_RATE = 22050;
 // 2: tempo robusto frente a arpegios en corcheas con puntillo o tresillos.
 // 3: bombo medido solo donde suena (bombo suave o en parte del tema).
 // 4: candidatos sin autocorrelación en su periodo penalizados (arpegio con puntillo, bombo débil).
-export const ANALYSIS_VERSION = 4;
+// 5: tempo propio del bombo como candidato (patrón cada 5 semicorcheas, 122 leído como 97,6).
+export const ANALYSIS_VERSION = 5;
 
 // ---------------------------------------------------------------- FFT ----
 
@@ -278,6 +279,23 @@ function estimateTempo(feat, bpmHint = null) {
   const ratios = [1, 3 / 4, 2 / 3, 4 / 3, 3 / 2];
   const cands = bpmHint ? [coarse] : ratios.map((r) => coarse * r).filter(inRange);
   const kickFitAt = (b) => combScore(kick, (60 * fps) / b, 1, active).score / mK;
+  // Tempo propio del bombo: un delay o arpegio cada 5 semicorcheas domina la autocorrelación
+  // (122 BPM leído como 97,6) y su tempo no tiene relación de puntillo ni tresillo con el real.
+  // Si el bombo es claro y regular, su tempo entra como candidato, salvo que algún candidato ya
+  // sea múltiplo suyo: el filtro peine puntúa igual los subarmónicos (bombo a 160 = 80).
+  let kickTempo = 0;
+  let kickTempoFit = 0;
+  if (!bpmHint && kN > fps * 8) {
+    for (let b = MIN_BPM; b < MAX_BPM; b += 0.05) {
+      const s = kickFitAt(b);
+      if (s > kickTempoFit) {
+        kickTempoFit = s;
+        kickTempo = b;
+      }
+    }
+    const explained = cands.some((c) => [1, 4 / 3, 3 / 2, 2, 3].some((m) => Math.abs(c / (kickTempo * m) - 1) < 0.015));
+    if (kickTempoFit >= 2.5 && !explained) cands.push(kickTempo);
+  }
   const kickStrength = kN > fps * 8 ? Math.max(...cands.map(kickFitAt)) : 0;
   const wK = 2 * clamp01((kickStrength - 1.15) / 0.6);
   const pulse = new Float32Array(n);
@@ -341,6 +359,8 @@ function estimateTempo(feat, bpmHint = null) {
     kickStrength: Math.round(kickStrength * 100) / 100,
     kickWeight: Math.round(wK * 100) / 100,
     kickActivePct: Math.round((kN / n) * 100),
+    kickTempo: Math.round(kickTempo * 100) / 100,
+    kickTempoFit: Math.round(kickTempoFit * 100) / 100,
   };
   return { bpm: Math.round(bestBpm * 100) / 100, period, phase, confidence, info };
 }

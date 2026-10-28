@@ -92,6 +92,15 @@ test('bombo suave con arpegio de ataque seco: sigue en 120', () => {
   assert.ok(Math.abs(r.bpm - 120) < 0.3, `bpm=${r.bpm}`);
 });
 
+// Delay o arpegio cada 5 semicorcheas (1,25 tiempos): su pulso, a 4/5 del tempo, no debe
+// imponerse al bombo (Abity - Echo Drift: 122 BPM leído como 97,6).
+test('patrón cada 5 semicorcheas no convierte 122 BPM en 97,6', () => {
+  for (const gain of [0.5, 0.8]) {
+    const r = analyzeTrack(synthTrack({ bpm: 122, chords: A_MINOR, bass: A_MINOR_BASS, seconds: 60, arp: { everyBeats: 1.25, notes: ARP, gain } }));
+    assert.ok(Math.abs(r.bpm - 122) < 0.3, `arpegio ${gain}: bpm=${r.bpm}`);
+  }
+});
+
 test('BPM indicado a mano: se respeta y la rejilla y los cues se calculan con él', () => {
   // Caso que el detector automático aún confunde (bombo solo en parte del tema + arpegio seco).
   const x = synthTrack({
