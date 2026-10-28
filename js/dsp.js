@@ -10,7 +10,8 @@ export const ANALYSIS_SAMPLE_RATE = 22050;
 // 3: bombo medido solo donde suena (bombo suave o en parte del tema).
 // 4: candidatos sin autocorrelación en su periodo penalizados (arpegio con puntillo, bombo débil).
 // 5: tempo propio del bombo como candidato (patrón cada 5 semicorcheas, 122 leído como 97,6).
-export const ANALYSIS_VERSION = 5;
+// 6: candidato ajustado al múltiplo exacto del tempo del bombo (121 leído como 80,7).
+export const ANALYSIS_VERSION = 6;
 
 // ---------------------------------------------------------------- FFT ----
 
@@ -282,7 +283,9 @@ function estimateTempo(feat, bpmHint = null) {
   // Tempo propio del bombo: un delay o arpegio cada 5 semicorcheas domina la autocorrelación
   // (122 BPM leído como 97,6) y su tempo no tiene relación de puntillo ni tresillo con el real.
   // Si el bombo es claro y regular, su tempo entra como candidato, salvo que algún candidato ya
-  // sea múltiplo suyo: el filtro peine puntúa igual los subarmónicos (bombo a 160 = 80).
+  // sea múltiplo suyo: el filtro peine puntúa igual los subarmónicos (bombo a 160 = 80). En ese
+  // caso el candidato se ajusta al múltiplo exacto: en una pista larga el pico del bombo es tan
+  // estrecho que 0,1 BPM de desvío lo pierde (121,1 frente a 121: 121 leído como 80,7).
   let kickTempo = 0;
   let kickTempoFit = 0;
   if (!bpmHint && kN > fps * 8) {
@@ -293,8 +296,18 @@ function estimateTempo(feat, bpmHint = null) {
         kickTempo = b;
       }
     }
-    const explained = cands.some((c) => [1, 4 / 3, 3 / 2, 2, 3].some((m) => Math.abs(c / (kickTempo * m) - 1) < 0.015));
-    if (kickTempoFit >= 2.5 && !explained) cands.push(kickTempo);
+    if (kickTempoFit >= 2.5) {
+      let explained = false;
+      for (let i = 0; i < cands.length; i++) {
+        const m = [1, 4 / 3, 3 / 2, 2, 3].find((k) => Math.abs(cands[i] / (kickTempo * k) - 1) < 0.015);
+        if (m && inRange(kickTempo * m)) {
+          if (cands[i] === coarse) coarse = kickTempo * m;
+          cands[i] = kickTempo * m;
+          explained = true;
+        }
+      }
+      if (!explained) cands.push(kickTempo);
+    }
   }
   const kickStrength = kN > fps * 8 ? Math.max(...cands.map(kickFitAt)) : 0;
   const wK = 2 * clamp01((kickStrength - 1.15) / 0.6);
