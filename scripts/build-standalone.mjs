@@ -37,7 +37,7 @@ const bundle = (names) => `(() => {\n'use strict';\nconst __mods = {};\n${names.
 const workerSrc = bundle(['camelot', 'dsp', 'worker']);
 
 // App: el worker se crea desde el código incrustado en lugar de desde ./worker.js.
-let appSrc = bundle(['camelot', 'dsp', 'id3', 'aiff', 'setbuilder', 'synth', 'demo', 'rekordbox', 'app']);
+let appSrc = bundle(['camelot', 'dsp', 'id3', 'aiff', 'setbuilder', 'synth', 'demo', 'rekordbox', 'vocals', 'app']);
 const workerExpr = "new Worker(new URL('./worker.js', import.meta.url), { type: 'module' })";
 if (!appSrc.includes(workerExpr)) throw new Error('No se encontró la creación del worker en app.js');
 appSrc = appSrc.replace(workerExpr, 'new Worker(KEYMIX_WORKER_URL)');

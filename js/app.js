@@ -5,6 +5,7 @@ import { isAiff, parseAiff, encodeWav } from './aiff.js';
 import { makeDemoFiles } from './demo.js';
 import { buildRekordboxXml } from './rekordbox.js';
 import { buildSet, describeTransition, transitionCost, bpmDistance, pathCost } from './setbuilder.js';
+import { VOCALS_FILE, classifyVocals, parseVocalsFile, vocalsKey } from './vocals.js';
 
 // ------------------------------------------------------------- Estado ----
 
@@ -97,7 +98,7 @@ const b64 = {
 function serializeTrack(t) {
   const r = t.result;
   return {
-    id: t.id, fileKey: t.fileKey, name: t.name, relPath: t.relPath || null, bpmHint: t.bpmHint || null, needsReanalysis: !!t.needsReanalysis, title: t.title, artist: t.artist, size: t.size, addedAt: t.addedAt, index: t.index,
+    id: t.id, fileKey: t.fileKey, name: t.name, relPath: t.relPath || null, bpmHint: t.bpmHint || null, needsReanalysis: !!t.needsReanalysis, title: t.title, artist: t.artist, size: t.size, addedAt: t.addedAt, index: t.index, vocals: t.vocals || null,
     result: { ...r, waveform: Object.fromEntries(Object.entries(r.waveform).map(([k, v]) => [k, b64.enc(v)])) },
   };
 }
@@ -442,11 +443,13 @@ const filePaths = new WeakMap();
  * Devuelve cuántas pistas existentes se vincularon.
  */
 function addFiles(files, handles = [], { relinkOnly = false } = {}) {
+  const vocalFiles = [...files].filter((f) => f.name === VOCALS_FILE);
+  if (vocalFiles.length) setTimeout(() => applyVocalFiles(vocalFiles, { quiet: relinkOnly }));
   let list = [...files].map((file, i) => ({ file, handle: handles[i] || null }))
     .filter(({ file }) => AUDIO_EXT.test(file.name) || file.type.startsWith('audio/'));
   if (relinkOnly) list = list.filter(({ file }) => state.tracks.some((t) => t.fileKey === fileKey(file) && !t.file));
   if (!list.length) {
-    if (!relinkOnly) toast('No se encontraron archivos de audio', 'error');
+    if (!relinkOnly && !vocalFiles.length) toast('No se encontraron archivos de audio', 'error');
     return 0;
   }
   let cached = 0;
@@ -500,13 +503,56 @@ function addFiles(files, handles = [], { relinkOnly = false } = {}) {
   return linked;
 }
 
+/**
+ * Aplica las medidas de `keymix-voces.json` (las genera scripts/vocals.py) a las pistas con el
+ * mismo nombre y tamaño. Las pistas que se añadan después se completan al leer otra vez el archivo.
+ */
+async function applyVocalFiles(files, { quiet = false } = {}) {
+  let changed = 0;
+  for (const file of files) {
+    try {
+      const byKey = new Map(parseVocalsFile(await file.text()).map((v) => [v.key, v]));
+      for (const t of state.tracks) {
+        const v = byKey.get(vocalsKey(t.name, t.size));
+        if (!v) continue;
+        const vocals = { seg: v.seg, segSec: v.segSec, model: v.model };
+        if (JSON.stringify(vocals) === JSON.stringify(t.vocals)) continue;
+        t.vocals = vocals;
+        changed++;
+      }
+    } catch (err) {
+      if (!quiet) toast(`No se pudo leer ${file.name}: ${err.message}`, 'error');
+    }
+  }
+  if (!changed) return;
+  toast(`Voces: medidas cargadas para ${changed} pista(s) desde ${VOCALS_FILE}`);
+  save();
+  scheduleRender();
+}
+
+const vocalCache = new WeakMap();
+/** Resultado de classifyVocals para la pista, o null si no tiene medidas. */
+function vocalInfo(t) {
+  if (!t.vocals) return null;
+  if (!vocalCache.has(t.vocals)) vocalCache.set(t.vocals, classifyVocals(t.vocals));
+  return vocalCache.get(t.vocals);
+}
+
+function vocalCell(t) {
+  const v = vocalInfo(t);
+  if (!v) return el('span', { class: 'voc-none', title: `Sin medir: ejecuta scripts/vocals.py en la carpeta y vuelve a abrirla (${VOCALS_FILE})` }, '—');
+  const pct = (v.share * 100).toFixed(1).replace('.', ',');
+  const where = v.sections.length ? `: ${v.sections.map(([a, b]) => `${fmtTime(a)}–${fmtTime(b)}`).join(', ')}` : '';
+  return el('span', { class: v.vocal ? 'voc-yes' : 'voc-no', title: `Voz en el ${pct} % del tema${where}` }, v.vocal ? 'Voz' : 'Instr.');
+}
+
 /** Lee los archivos de audio de una carpeta (hasta 4 niveles de subcarpetas). */
 async function readFolder(dir) {
   const files = [];
   const handles = [];
   async function walk(d, depth, prefix) {
     for await (const entry of d.values()) {
-      if (entry.kind === 'file' && AUDIO_EXT.test(entry.name)) {
+      if (entry.kind === 'file' && (AUDIO_EXT.test(entry.name) || entry.name === VOCALS_FILE)) {
         const file = await entry.getFile();
         filePaths.set(file, prefix + entry.name);
         handles.push(entry);
@@ -667,6 +713,7 @@ function visibleTracks() {
       case 'bpm': return t.result?.bpm ?? 9999;
       case 'energy': return t.result?.energy ?? 99;
       case 'duration': return t.result?.duration ?? 1e9;
+      case 'vocals': return vocalInfo(t)?.share ?? 9;
       default: return t.index;
     }
   };
@@ -748,6 +795,7 @@ function renderTable() {
       el('td', { class: 'c-key' }, t.result?.key ? keyChip(t) : '—'),
       el('td', { class: 'c-bpm' }, t.result ? fmtBpm(t.result.bpm) : '—'),
       el('td', { class: 'c-energy' }, t.result ? energyBar(t.result.energy) : '—'),
+      el('td', { class: 'c-voc' }, vocalCell(t)),
       el('td', { class: 'c-dur' }, t.result ? fmtTime(t.result.duration) : '—'),
       el('td', { class: 'c-status' }, statusCell(t)));
       return tr;

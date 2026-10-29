@@ -218,6 +218,9 @@ table.tracks { width: 100%; border-collapse: collapse; }
 .c-bpm { width: 70px; font-variant-numeric: tabular-nums; }
 .c-energy { width: 130px; }
 .c-dur { width: 80px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.c-voc { width: 64px; }
+.voc-yes { color: var(--accent); font-weight: 600; }
+.voc-no, .voc-none { color: var(--muted); }
 .c-status { width: 130px; }
 .t-title { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 46ch; }
 .t-artist { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 46ch; }
@@ -489,7 +492,7 @@ table.tracks { width: 100%; border-collapse: collapse; }
     </div>
     <div class="actions">
       <label class="btn primary" title="Añadir archivos de audio (A)">
-        <input id="file-input" type="file" accept="audio/*,.mp3,.wav,.flac,.m4a,.aac,.ogg,.aiff,.aif" multiple hidden />
+        <input id="file-input" type="file" accept="audio/*,.mp3,.wav,.flac,.m4a,.aac,.ogg,.aiff,.aif,.json" multiple hidden />
         <span>＋ Añadir pistas</span>
       </label>
       <button id="btn-folder" class="btn" hidden title="Abrir una carpeta y poder guardar etiquetas en los archivos originales">📁 Abrir carpeta</button>
@@ -544,6 +547,7 @@ table.tracks { width: 100%; border-collapse: collapse; }
               <th data-sort="key" class="c-key">Tono</th>
               <th data-sort="bpm" class="c-bpm">BPM</th>
               <th data-sort="energy" class="c-energy">Energía</th>
+              <th data-sort="vocals" class="c-voc" title="Con voz o instrumental, según scripts/vocals.py">Voz</th>
               <th data-sort="duration" class="c-dur">Duración</th>
               <th class="c-status">Estado</th>
             </tr>
@@ -2234,6 +2238,59 @@ function buildRekordboxXml(tracks, opts) {
 return { kindOf, locationUrl, firstDownbeat, buildRekordboxXml };
 })();
 
+__mods["vocals"] = (() => {
+/**
+ * Detección de voces a partir de la separación que hace `scripts/vocals.py` (Demucs) fuera del
+ * navegador. El script guarda, por cada segmento de 3 s, la energía de la voz separada respecto
+ * a la mezcla en dB; aquí se decide si la pista tiene voz.
+ *
+ * Regla, ajustada con 18 pistas etiquetadas a mano (8 con voz, 10 instrumentales): un segmento
+ * cuenta como voz si supera -10 dB y su vecino también (los golpes aislados suelen ser sintes o
+ * efectos que Demucs confunde con voz); la pista tiene voz si esos segmentos son al menos el 2,5 %.
+ */
+
+const VOCALS_FILE = 'keymix-voces.json';
+const VOCAL_DB = -10;
+const VOCAL_MIN_SHARE = 0.025;
+
+const vocalsKey = (name, size) => `${name}|${size}`;
+
+/**
+ * Clasifica las medidas de una pista: `{ seg: [dB | null], segSec }`.
+ * Devuelve `{ vocal, share, sections: [[inicio, fin] en segundos] }`, o null si no hay medidas.
+ * Los segmentos en silencio (null) no cuentan en el total.
+ */
+function classifyVocals(v) {
+  const idx = [];
+  (v?.seg || []).forEach((db, i) => { if (db != null) idx.push(i); });
+  if (!idx.length) return null;
+  const loud = idx.map((i) => v.seg[i] > VOCAL_DB);
+  const inRun = loud.map((x, k) => x && (loud[k - 1] || loud[k + 1]) === true);
+  const sections = [];
+  inRun.forEach((x, k) => {
+    if (!x) return;
+    const start = idx[k] * v.segSec;
+    const end = (idx[k] + 1) * v.segSec;
+    if (inRun[k - 1]) sections[sections.length - 1][1] = end;
+    else sections.push([start, end]);
+  });
+  const share = inRun.filter(Boolean).length / idx.length;
+  return { vocal: share >= VOCAL_MIN_SHARE, share, sections };
+}
+
+/** Lee `keymix-voces.json` y devuelve `[{ key, seg, segSec, model }]`. */
+function parseVocalsFile(text) {
+  const data = JSON.parse(text);
+  if (data?.format !== 'keymix-voces' || typeof data.tracks !== 'object') throw new Error(`No es un archivo ${VOCALS_FILE}`);
+  if (data.version !== 1) throw new Error(`Versión ${data.version} de ${VOCALS_FILE} no soportada`);
+  return Object.values(data.tracks)
+    .filter((t) => t && typeof t.name === 'string' && Number.isFinite(t.size) && Array.isArray(t.seg))
+    .map((t) => ({ key: vocalsKey(t.name, t.size), seg: t.seg, segSec: t.segSec || 3, model: data.model || null }));
+}
+
+return { VOCALS_FILE, VOCAL_DB, VOCAL_MIN_SHARE, vocalsKey, classifyVocals, parseVocalsFile };
+})();
+
 __mods["app"] = (() => {
 const { ANALYSIS_SAMPLE_RATE, ANALYSIS_VERSION, energyFromFeatures } = __mods["dsp"];
 const { formatKey, keyColor, compatibility, fromCamelot, relativeCode, referenceMidi } = __mods["camelot"];
@@ -2242,6 +2299,7 @@ const { isAiff, parseAiff, encodeWav } = __mods["aiff"];
 const { makeDemoFiles } = __mods["demo"];
 const { buildRekordboxXml } = __mods["rekordbox"];
 const { buildSet, describeTransition, transitionCost, bpmDistance, pathCost } = __mods["setbuilder"];
+const { VOCALS_FILE, classifyVocals, parseVocalsFile, vocalsKey } = __mods["vocals"];
 // ------------------------------------------------------------- Estado ----
 
 const STORAGE_KEY = 'keymix.library.v1';
@@ -2333,7 +2391,7 @@ const b64 = {
 function serializeTrack(t) {
   const r = t.result;
   return {
-    id: t.id, fileKey: t.fileKey, name: t.name, relPath: t.relPath || null, bpmHint: t.bpmHint || null, needsReanalysis: !!t.needsReanalysis, title: t.title, artist: t.artist, size: t.size, addedAt: t.addedAt, index: t.index,
+    id: t.id, fileKey: t.fileKey, name: t.name, relPath: t.relPath || null, bpmHint: t.bpmHint || null, needsReanalysis: !!t.needsReanalysis, title: t.title, artist: t.artist, size: t.size, addedAt: t.addedAt, index: t.index, vocals: t.vocals || null,
     result: { ...r, waveform: Object.fromEntries(Object.entries(r.waveform).map(([k, v]) => [k, b64.enc(v)])) },
   };
 }
@@ -2678,11 +2736,13 @@ const filePaths = new WeakMap();
  * Devuelve cuántas pistas existentes se vincularon.
  */
 function addFiles(files, handles = [], { relinkOnly = false } = {}) {
+  const vocalFiles = [...files].filter((f) => f.name === VOCALS_FILE);
+  if (vocalFiles.length) setTimeout(() => applyVocalFiles(vocalFiles, { quiet: relinkOnly }));
   let list = [...files].map((file, i) => ({ file, handle: handles[i] || null }))
     .filter(({ file }) => AUDIO_EXT.test(file.name) || file.type.startsWith('audio/'));
   if (relinkOnly) list = list.filter(({ file }) => state.tracks.some((t) => t.fileKey === fileKey(file) && !t.file));
   if (!list.length) {
-    if (!relinkOnly) toast('No se encontraron archivos de audio', 'error');
+    if (!relinkOnly && !vocalFiles.length) toast('No se encontraron archivos de audio', 'error');
     return 0;
   }
   let cached = 0;
@@ -2736,13 +2796,56 @@ function addFiles(files, handles = [], { relinkOnly = false } = {}) {
   return linked;
 }
 
+/**
+ * Aplica las medidas de `keymix-voces.json` (las genera scripts/vocals.py) a las pistas con el
+ * mismo nombre y tamaño. Las pistas que se añadan después se completan al leer otra vez el archivo.
+ */
+async function applyVocalFiles(files, { quiet = false } = {}) {
+  let changed = 0;
+  for (const file of files) {
+    try {
+      const byKey = new Map(parseVocalsFile(await file.text()).map((v) => [v.key, v]));
+      for (const t of state.tracks) {
+        const v = byKey.get(vocalsKey(t.name, t.size));
+        if (!v) continue;
+        const vocals = { seg: v.seg, segSec: v.segSec, model: v.model };
+        if (JSON.stringify(vocals) === JSON.stringify(t.vocals)) continue;
+        t.vocals = vocals;
+        changed++;
+      }
+    } catch (err) {
+      if (!quiet) toast(`No se pudo leer ${file.name}: ${err.message}`, 'error');
+    }
+  }
+  if (!changed) return;
+  toast(`Voces: medidas cargadas para ${changed} pista(s) desde ${VOCALS_FILE}`);
+  save();
+  scheduleRender();
+}
+
+const vocalCache = new WeakMap();
+/** Resultado de classifyVocals para la pista, o null si no tiene medidas. */
+function vocalInfo(t) {
+  if (!t.vocals) return null;
+  if (!vocalCache.has(t.vocals)) vocalCache.set(t.vocals, classifyVocals(t.vocals));
+  return vocalCache.get(t.vocals);
+}
+
+function vocalCell(t) {
+  const v = vocalInfo(t);
+  if (!v) return el('span', { class: 'voc-none', title: `Sin medir: ejecuta scripts/vocals.py en la carpeta y vuelve a abrirla (${VOCALS_FILE})` }, '—');
+  const pct = (v.share * 100).toFixed(1).replace('.', ',');
+  const where = v.sections.length ? `: ${v.sections.map(([a, b]) => `${fmtTime(a)}–${fmtTime(b)}`).join(', ')}` : '';
+  return el('span', { class: v.vocal ? 'voc-yes' : 'voc-no', title: `Voz en el ${pct} % del tema${where}` }, v.vocal ? 'Voz' : 'Instr.');
+}
+
 /** Lee los archivos de audio de una carpeta (hasta 4 niveles de subcarpetas). */
 async function readFolder(dir) {
   const files = [];
   const handles = [];
   async function walk(d, depth, prefix) {
     for await (const entry of d.values()) {
-      if (entry.kind === 'file' && AUDIO_EXT.test(entry.name)) {
+      if (entry.kind === 'file' && (AUDIO_EXT.test(entry.name) || entry.name === VOCALS_FILE)) {
         const file = await entry.getFile();
         filePaths.set(file, prefix + entry.name);
         handles.push(entry);
@@ -2903,6 +3006,7 @@ function visibleTracks() {
       case 'bpm': return t.result?.bpm ?? 9999;
       case 'energy': return t.result?.energy ?? 99;
       case 'duration': return t.result?.duration ?? 1e9;
+      case 'vocals': return vocalInfo(t)?.share ?? 9;
       default: return t.index;
     }
   };
@@ -2984,6 +3088,7 @@ function renderTable() {
       el('td', { class: 'c-key' }, t.result?.key ? keyChip(t) : '—'),
       el('td', { class: 'c-bpm' }, t.result ? fmtBpm(t.result.bpm) : '—'),
       el('td', { class: 'c-energy' }, t.result ? energyBar(t.result.energy) : '—'),
+      el('td', { class: 'c-voc' }, vocalCell(t)),
       el('td', { class: 'c-dur' }, t.result ? fmtTime(t.result.duration) : '—'),
       el('td', { class: 'c-status' }, statusCell(t)));
       return tr;

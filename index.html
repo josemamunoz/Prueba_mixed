@@ -16,7 +16,7 @@
     </div>
     <div class="actions">
       <label class="btn primary" title="Añadir archivos de audio (A)">
-        <input id="file-input" type="file" accept="audio/*,.mp3,.wav,.flac,.m4a,.aac,.ogg,.aiff,.aif" multiple hidden />
+        <input id="file-input" type="file" accept="audio/*,.mp3,.wav,.flac,.m4a,.aac,.ogg,.aiff,.aif,.json" multiple hidden />
         <span>＋ Añadir pistas</span>
       </label>
       <button id="btn-folder" class="btn" hidden title="Abrir una carpeta y poder guardar etiquetas en los archivos originales">📁 Abrir carpeta</button>
@@ -71,6 +71,7 @@
               <th data-sort="key" class="c-key">Tono</th>
               <th data-sort="bpm" class="c-bpm">BPM</th>
               <th data-sort="energy" class="c-energy">Energía</th>
+              <th data-sort="vocals" class="c-voc" title="Con voz o instrumental, según scripts/vocals.py">Voz</th>
               <th data-sort="duration" class="c-dur">Duración</th>
               <th class="c-status">Estado</th>
             </tr>

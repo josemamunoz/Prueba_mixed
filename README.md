@@ -19,6 +19,7 @@ Además incluye:
 - **Carpetas recordadas** (Chrome y Edge): las carpetas abiertas con **Abrir carpeta** se recuerdan y, al reabrir la app, sus archivos se vuelven a vincular solos. Si el navegador vuelve a pedir permiso, aparece un aviso con **Reconectar** (elige «Permitir en cada visita» para no tener que hacerlo más). Los archivos añadidos con **Añadir pistas** no se pueden recordar. **Vaciar biblioteca** también olvida las carpetas.
 - **Volver a analizar**: el botón **↻ Volver a analizar** de la barra superior repite el análisis de las pistas marcadas; si no hay ninguna marcada, el de la seleccionada, y si tampoco hay selección (Esc la quita), el de toda la biblioteca. La etiqueta del botón indica cuál de los tres hará; el panel de cada pista tiene su propio botón. Las pistas sin archivo vinculado se buscan primero en las carpetas recordadas; si no están, se pide la carpeta o los archivos.
 - **Eliminar de la biblioteca**: al marcar pistas aparece **🗑 Eliminar marcadas** en la barra superior; el panel de cada pista tiene **🗑 Eliminar de la biblioteca**, y la tecla Supr quita las marcadas o, si no hay ninguna, la seleccionada. Siempre pide confirmación y solo borra el análisis guardado: los archivos no se tocan.
+- **Con voz o instrumental**: la columna **Voz** indica si la pista tiene voces. La medida la hace un script aparte, fuera del navegador (ver [Detectar voces](#detectar-voces)).
 - Exportación de la biblioteca a CSV o JSON.
 
 ## Uso sin servidor (doble clic)
@@ -76,6 +77,21 @@ Ningún detector acierta siempre, y cada programa (Beatport, Rekordbox, Mixed In
 Rekordbox no lee cue points desde las etiquetas de los archivos: los importa desde un archivo **rekordbox XML**. En **Exportar → Para Rekordbox (XML con cue points)…** indica la carpeta donde están los archivos que vas a cargar (los originales o las copias etiquetadas) y guarda `keymix-rekordbox.xml`. Incluye hasta 8 hot cues (A–H) con su nombre y color, un memory cue en cada uno, la rejilla de beats, la tonalidad, el BPM y el comentario con la energía.
 
 En Rekordbox: **Preferencias → Avanzado → Base de datos → rekordbox xml → Biblioteca importada** y elige el XML. Activa la vista del árbol «rekordbox xml» (**Preferencias → Vista → Diseño**). En el panel izquierdo, abre **rekordbox xml → Todas las pistas**, selecciona las pistas y usa clic derecho → **Importar a la colección**.
+
+### Detectar voces
+
+Distinguir una voz suave de un sinte en una mezcla completa requiere separar la voz del resto, y eso es demasiado lento para el navegador. Lo hace `scripts/vocals.py` con [Demucs](https://github.com/facebookresearch/demucs) (modelo `htdemucs`), una vez por biblioteca. Necesita Python 3.9 o superior:
+
+```bash
+pip install -r scripts/requirements-vocals.txt
+python scripts/vocals.py "F:/Musica/Progressive"
+```
+
+La primera vez descarga el modelo (unos 80 MB). En una CPU normal tarda más o menos lo que dura cada tema, así que una biblioteca grande lleva horas: se puede interrumpir con Ctrl+C y volver a lanzar, porque guarda cada pista al terminarla y salta las ya medidas (mismo nombre y tamaño). Recorre hasta 4 niveles de subcarpetas y escribe `keymix-voces.json` en la carpeta indicada.
+
+Después, abre esa carpeta en la app con **Abrir carpeta** (o arrastra la carpeta, o `keymix-voces.json` con «Añadir pistas»): la columna **Voz** muestra **Voz** o **Instr.**, y al pasar el ratón, el porcentaje del tema con voz y los tramos donde aparece. **—** significa que la pista aún no se ha medido. Las medidas se guardan con la biblioteca. Si ejecutas el script otra vez después de añadir temas, vuelve a abrir la carpeta para cargar los nuevos.
+
+Cómo decide: por cada segmento de 3 s, compara la energía de la voz separada con la de la mezcla. Un segmento cuenta como voz si supera -10 dB y el de al lado también (los golpes sueltos suelen ser sintes que Demucs confunde con voz), y la pista tiene voz si esos segmentos son al menos el 2,5 % del tema. La regla se ajustó con 18 temas de progressive house etiquetados a mano y los acierta todos, pero el margen es estrecho: una voz muy breve o muy procesada puede salir como instrumental. La regla está en `js/vocals.js`, así que se puede ajustar sin volver a separar.
 
 ## Cómo funciona
 

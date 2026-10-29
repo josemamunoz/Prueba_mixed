@@ -209,6 +209,9 @@ table.tracks { width: 100%; border-collapse: collapse; }
 .c-bpm { width: 70px; font-variant-numeric: tabular-nums; }
 .c-energy { width: 130px; }
 .c-dur { width: 80px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.c-voc { width: 64px; }
+.voc-yes { color: var(--accent); font-weight: 600; }
+.voc-no, .voc-none { color: var(--muted); }
 .c-status { width: 130px; }
 .t-title { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 46ch; }
 .t-artist { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 46ch; }
