@@ -15,8 +15,8 @@ Branch: feat/vocal-detection · Delivery: ask-on-risk · Tests: `npm test` (node
 
 | ID | Specs | Route | Status | Commit |
 | --- | --- | --- | --- | --- |
-| T1 | S4 | inline | pending | |
-| T2 | S1, S2 | inline | pending | |
+| T1 | S4 | inline | done: 7 tests GREEN, 18/18 on the labeled Demucs data | e333b85 |
+| T2 | S1, S2 | inline | done: ran on a temp folder (WAV in subfolder + silent AIFF), rerun skipped both, output parsed by js/vocals.js | this commit |
 | T3 | S3, S5 | inline | pending | |
 
 ## Log
