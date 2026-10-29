@@ -21,9 +21,9 @@ Branch: feat/vocal-detection · Delivery: ask-on-risk · Tests: `npm test` (node
 | T1 | S4 | inline | done: 7 tests GREEN, 18/18 on the labeled Demucs data | e333b85 |
 | T2 | S1, S2 | inline | done: ran on a temp folder (WAV in subfolder + silent AIFF), rerun skipped both, output parsed by js/vocals.js | ed77c55 |
 | T3 | S3, S5 | inline | done: suite 32 pass / 0 fail; headless Chrome dropped a WAV + keymix-voces.json: «Voz» with tooltip, «—» for unmeasured, sort works, survives reload, no console errors | 3efc5ab |
-| T4 | S6 | inline | done: corrupt keymix-voces.json dropped in headless Chrome shows the error toast and a console warning; the relink path now goes through the same code (no quiet mode); happy path rechecked | this commit |
-| T5 | S7 | inline | done: temp folder with a good and a broken WAV: failures listed, exit 1, rerun retries only the broken one; a corrupt keymix-voces.json exits with a clear message | this commit |
-| T6 | S8 | inline | done: applyVocals extracted to js/vocals.js, test RED then GREEN; suite 33 pass / 0 fail / 11 skipped (already skipped before) | this commit |
+| T4 | S6 | inline | done: corrupt keymix-voces.json dropped in headless Chrome shows the error toast and a console warning; the relink path now goes through the same code (no quiet mode); happy path rechecked | 966b5c3 |
+| T5 | S7 | inline | done: temp folder with a good and a broken WAV: failures listed, exit 1, rerun retries only the broken one; a corrupt keymix-voces.json exits with a clear message | 966b5c3 |
+| T6 | S8 | inline | done: applyVocals extracted to js/vocals.js, test RED then GREEN; suite 33 pass / 0 fail / 11 skipped (already skipped before) | 966b5c3 |
 
 ## Log
 
@@ -33,3 +33,4 @@ Branch: feat/vocal-detection · Delivery: ask-on-risk · Tests: `npm test` (node
 - L4: evidence. Demucs htdemucs on CPU runs at 0.64-1.7x realtime. Features over the corrected labels: p95 AUC 0.96 / LOO 89 %; run-filtered fraction above -10 dB AUC 1.00 / LOO 94 % (vocal 2.9-16.9 %, instrumental 0-2.2 %). YAMNet, Essentia voice_instrumental and pitch contours were rejected earlier.
 - L5 (2026-10-29): native review granted by the user; lenses resilience, readability, reliability; approved and acknowledged (lineage review-021467e0cf6caaae, authority burned). Non-blocking follow-ups: scripts/vocals.py skips .m4a/.aac that the app accepts; a rejected keymix-voces.json is silent when remembered folders relink; the script exits 0 and prints «Listo» even when tracks failed; no integration test for applyVocalFiles.
 - L6 (2026-10-29, user): "Arregla el 2, 3 y 4. El 1 no lo necesitaré porque solo tengo archivos wav y aiff"
+- L7 (2026-10-29): second native review (3efc5ab..966b5c3) granted by the user; lenses resilience, reliability; approved and acknowledged (lineage review-37886550149e59f9). Non-blocking suggestions: no automated test for the script exit code and failure summary, nor for the app error toast (both checked by hand).
