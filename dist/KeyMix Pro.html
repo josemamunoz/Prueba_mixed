@@ -2278,6 +2278,24 @@ function classifyVocals(v) {
   return { vocal: share >= VOCAL_MIN_SHARE, share, sections };
 }
 
+/**
+ * Copia en `t.vocals` las medidas de las pistas con el mismo nombre y tamaño.
+ * Devuelve cuántas pistas cambiaron (las que ya tenían esas mismas medidas no cuentan).
+ */
+function applyVocals(tracks, entries) {
+  const byKey = new Map(entries.map((v) => [v.key, v]));
+  let changed = 0;
+  for (const t of tracks) {
+    const v = byKey.get(vocalsKey(t.name, t.size));
+    if (!v) continue;
+    const vocals = { seg: v.seg, segSec: v.segSec, model: v.model };
+    if (JSON.stringify(vocals) === JSON.stringify(t.vocals)) continue;
+    t.vocals = vocals;
+    changed++;
+  }
+  return changed;
+}
+
 /** Lee `keymix-voces.json` y devuelve `[{ key, seg, segSec, model }]`. */
 function parseVocalsFile(text) {
   const data = JSON.parse(text);
@@ -2288,7 +2306,7 @@ function parseVocalsFile(text) {
     .map((t) => ({ key: vocalsKey(t.name, t.size), seg: t.seg, segSec: t.segSec || 3, model: data.model || null }));
 }
 
-return { VOCALS_FILE, VOCAL_DB, VOCAL_MIN_SHARE, vocalsKey, classifyVocals, parseVocalsFile };
+return { VOCALS_FILE, VOCAL_DB, VOCAL_MIN_SHARE, vocalsKey, classifyVocals, applyVocals, parseVocalsFile };
 })();
 
 __mods["app"] = (() => {
@@ -2299,7 +2317,7 @@ const { isAiff, parseAiff, encodeWav } = __mods["aiff"];
 const { makeDemoFiles } = __mods["demo"];
 const { buildRekordboxXml } = __mods["rekordbox"];
 const { buildSet, describeTransition, transitionCost, bpmDistance, pathCost } = __mods["setbuilder"];
-const { VOCALS_FILE, classifyVocals, parseVocalsFile, vocalsKey } = __mods["vocals"];
+const { VOCALS_FILE, applyVocals, classifyVocals, parseVocalsFile } = __mods["vocals"];
 // ------------------------------------------------------------- Estado ----
 
 const STORAGE_KEY = 'keymix.library.v1';
@@ -2737,7 +2755,8 @@ const filePaths = new WeakMap();
  */
 function addFiles(files, handles = [], { relinkOnly = false } = {}) {
   const vocalFiles = [...files].filter((f) => f.name === VOCALS_FILE);
-  if (vocalFiles.length) setTimeout(() => applyVocalFiles(vocalFiles, { quiet: relinkOnly }));
+  // Se aplica después de crear las pistas nuevas de esta misma llamada, para que también se emparejen.
+  if (vocalFiles.length) setTimeout(() => applyVocalFiles(vocalFiles));
   let list = [...files].map((file, i) => ({ file, handle: handles[i] || null }))
     .filter(({ file }) => AUDIO_EXT.test(file.name) || file.type.startsWith('audio/'));
   if (relinkOnly) list = list.filter(({ file }) => state.tracks.some((t) => t.fileKey === fileKey(file) && !t.file));
@@ -2800,21 +2819,15 @@ function addFiles(files, handles = [], { relinkOnly = false } = {}) {
  * Aplica las medidas de `keymix-voces.json` (las genera scripts/vocals.py) a las pistas con el
  * mismo nombre y tamaño. Las pistas que se añadan después se completan al leer otra vez el archivo.
  */
-async function applyVocalFiles(files, { quiet = false } = {}) {
+async function applyVocalFiles(files) {
   let changed = 0;
   for (const file of files) {
     try {
-      const byKey = new Map(parseVocalsFile(await file.text()).map((v) => [v.key, v]));
-      for (const t of state.tracks) {
-        const v = byKey.get(vocalsKey(t.name, t.size));
-        if (!v) continue;
-        const vocals = { seg: v.seg, segSec: v.segSec, model: v.model };
-        if (JSON.stringify(vocals) === JSON.stringify(t.vocals)) continue;
-        t.vocals = vocals;
-        changed++;
-      }
+      changed += applyVocals(state.tracks, parseVocalsFile(await file.text()));
     } catch (err) {
-      if (!quiet) toast(`No se pudo leer ${file.name}: ${err.message}`, 'error');
+      // También al reconectar las carpetas recordadas: si no, la columna se queda en «—» sin motivo aparente.
+      console.warn(`${file.name} ilegible`, err);
+      toast(`No se pudo leer ${file.name}: ${err.message}. Las voces de esa carpeta no se han cargado.`, 'error', 8000);
     }
   }
   if (!changed) return;

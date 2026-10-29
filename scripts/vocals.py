@@ -44,8 +44,11 @@ def load_results(path, model):
     empty = {'format': 'keymix-voces', 'version': 1, 'model': model, 'tracks': {}}
     if not os.path.exists(path):
         return empty
-    with open(path, encoding='utf-8') as f:
-        data = json.load(f)
+    try:
+        with open(path, encoding='utf-8') as f:
+            data = json.load(f)
+    except ValueError as err:
+        sys.exit(f'{path} está dañado ({err}); renómbralo para empezar de cero.')
     if data.get('format') != 'keymix-voces' or data.get('version') != 1:
         sys.exit(f'{path} no es un archivo de este script; muévelo o bórralo antes de continuar.')
     if data.get('model') != model:
@@ -95,7 +98,7 @@ def main():
             pending.append((p, rel))
     print(f'{len(files)} pistas en {root}: {len(files) - len(pending)} ya medidas, {len(pending)} pendientes.')
     if not pending:
-        return
+        return 0
 
     # Se importan aquí para que el resumen de arriba salga aunque falten las dependencias.
     import soundfile as sf
@@ -110,6 +113,7 @@ def main():
     voc_index = model.sources.index('vocals')
     sr_model = model.samplerate
 
+    failed = []
     for n, (p, rel) in enumerate(pending, 1):
         t0 = time.time()
         try:
@@ -136,11 +140,18 @@ def main():
             print(f'[{n}/{len(pending)}] {rel} ({time.time() - t0:.0f} s)', flush=True)
         except Exception as err:  # una pista ilegible no debe parar el resto
             print(f'[{n}/{len(pending)}] {rel}: error, se salta ({err})', flush=True)
-    print(f'Listo: {out_path}')
+            failed.append((rel, err))
+    print(f'Medidas guardadas en {out_path}: {len(pending) - len(failed)} de {len(pending)} pistas.')
+    if failed:
+        print(f'{len(failed)} pista(s) con error (siguen sin medir; al volver a lanzarlo se reintentan):')
+        for rel, err in failed:
+            print(f'  {rel}: {err}')
+        return 1
+    return 0
 
 
 if __name__ == '__main__':
     try:
-        main()
+        sys.exit(main())
     except KeyboardInterrupt:
         sys.exit('\nInterrumpido. Las pistas terminadas ya están guardadas; vuelve a lanzarlo para seguir.')

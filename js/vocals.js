@@ -37,6 +37,24 @@ export function classifyVocals(v) {
   return { vocal: share >= VOCAL_MIN_SHARE, share, sections };
 }
 
+/**
+ * Copia en `t.vocals` las medidas de las pistas con el mismo nombre y tamaño.
+ * Devuelve cuántas pistas cambiaron (las que ya tenían esas mismas medidas no cuentan).
+ */
+export function applyVocals(tracks, entries) {
+  const byKey = new Map(entries.map((v) => [v.key, v]));
+  let changed = 0;
+  for (const t of tracks) {
+    const v = byKey.get(vocalsKey(t.name, t.size));
+    if (!v) continue;
+    const vocals = { seg: v.seg, segSec: v.segSec, model: v.model };
+    if (JSON.stringify(vocals) === JSON.stringify(t.vocals)) continue;
+    t.vocals = vocals;
+    changed++;
+  }
+  return changed;
+}
+
 /** Lee `keymix-voces.json` y devuelve `[{ key, seg, segSec, model }]`. */
 export function parseVocalsFile(text) {
   const data = JSON.parse(text);

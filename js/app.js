@@ -5,7 +5,7 @@ import { isAiff, parseAiff, encodeWav } from './aiff.js';
 import { makeDemoFiles } from './demo.js';
 import { buildRekordboxXml } from './rekordbox.js';
 import { buildSet, describeTransition, transitionCost, bpmDistance, pathCost } from './setbuilder.js';
-import { VOCALS_FILE, classifyVocals, parseVocalsFile, vocalsKey } from './vocals.js';
+import { VOCALS_FILE, applyVocals, classifyVocals, parseVocalsFile } from './vocals.js';
 
 // ------------------------------------------------------------- Estado ----
 
@@ -444,7 +444,8 @@ const filePaths = new WeakMap();
  */
 function addFiles(files, handles = [], { relinkOnly = false } = {}) {
   const vocalFiles = [...files].filter((f) => f.name === VOCALS_FILE);
-  if (vocalFiles.length) setTimeout(() => applyVocalFiles(vocalFiles, { quiet: relinkOnly }));
+  // Se aplica después de crear las pistas nuevas de esta misma llamada, para que también se emparejen.
+  if (vocalFiles.length) setTimeout(() => applyVocalFiles(vocalFiles));
   let list = [...files].map((file, i) => ({ file, handle: handles[i] || null }))
     .filter(({ file }) => AUDIO_EXT.test(file.name) || file.type.startsWith('audio/'));
   if (relinkOnly) list = list.filter(({ file }) => state.tracks.some((t) => t.fileKey === fileKey(file) && !t.file));
@@ -507,21 +508,15 @@ function addFiles(files, handles = [], { relinkOnly = false } = {}) {
  * Aplica las medidas de `keymix-voces.json` (las genera scripts/vocals.py) a las pistas con el
  * mismo nombre y tamaño. Las pistas que se añadan después se completan al leer otra vez el archivo.
  */
-async function applyVocalFiles(files, { quiet = false } = {}) {
+async function applyVocalFiles(files) {
   let changed = 0;
   for (const file of files) {
     try {
-      const byKey = new Map(parseVocalsFile(await file.text()).map((v) => [v.key, v]));
-      for (const t of state.tracks) {
-        const v = byKey.get(vocalsKey(t.name, t.size));
-        if (!v) continue;
-        const vocals = { seg: v.seg, segSec: v.segSec, model: v.model };
-        if (JSON.stringify(vocals) === JSON.stringify(t.vocals)) continue;
-        t.vocals = vocals;
-        changed++;
-      }
+      changed += applyVocals(state.tracks, parseVocalsFile(await file.text()));
     } catch (err) {
-      if (!quiet) toast(`No se pudo leer ${file.name}: ${err.message}`, 'error');
+      // También al reconectar las carpetas recordadas: si no, la columna se queda en «—» sin motivo aparente.
+      console.warn(`${file.name} ilegible`, err);
+      toast(`No se pudo leer ${file.name}: ${err.message}. Las voces de esa carpeta no se han cargado.`, 'error', 8000);
     }
   }
   if (!changed) return;

@@ -87,7 +87,7 @@ pip install -r scripts/requirements-vocals.txt
 python scripts/vocals.py "F:/Musica/Progressive"
 ```
 
-La primera vez descarga el modelo (unos 80 MB). En una CPU normal tarda más o menos lo que dura cada tema, así que una biblioteca grande lleva horas: se puede interrumpir con Ctrl+C y volver a lanzar, porque guarda cada pista al terminarla y salta las ya medidas (mismo nombre y tamaño). Recorre hasta 4 niveles de subcarpetas y escribe `keymix-voces.json` en la carpeta indicada.
+La primera vez descarga el modelo (unos 80 MB). En una CPU normal tarda más o menos lo que dura cada tema, así que una biblioteca grande lleva horas: se puede interrumpir con Ctrl+C y volver a lanzar, porque guarda cada pista al terminarla y salta las ya medidas (mismo nombre y tamaño). Recorre hasta 4 niveles de subcarpetas y escribe `keymix-voces.json` en la carpeta indicada. Un archivo que no se puede leer no detiene el resto: al terminar, el script lista las pistas con error y sale con código 1 (se reintentan en la siguiente ejecución).
 
 Después, abre esa carpeta en la app con **Abrir carpeta** (o arrastra la carpeta, o `keymix-voces.json` con «Añadir pistas»): la columna **Voz** muestra **Voz** o **Instr.**, y al pasar el ratón, el porcentaje del tema con voz y los tramos donde aparece. **—** significa que la pista aún no se ha medido. Las medidas se guardan con la biblioteca. Si ejecutas el script otra vez después de añadir temas, vuelve a abrir la carpeta para cargar los nuevos.
 

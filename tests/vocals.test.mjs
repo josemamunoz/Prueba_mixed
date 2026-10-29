@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { classifyVocals, parseVocalsFile, vocalsKey, VOCALS_FILE } from '../js/vocals.js';
+import { applyVocals, classifyVocals, parseVocalsFile, vocalsKey, VOCALS_FILE } from '../js/vocals.js';
 
 // Segmentos de 3 s: -40 dB es instrumental; los valores > -10 dB cuentan como voz.
 const track = (n, hits) => {
@@ -58,4 +58,36 @@ test('parseVocalsFile rechaza archivos que no son del script', () => {
   assert.throws(() => parseVocalsFile('{"tracks": {}}'), /keymix-voces/);
   assert.throws(() => parseVocalsFile('no es json'));
   assert.throws(() => parseVocalsFile(JSON.stringify({ format: 'keymix-voces', version: 2, tracks: {} })), /Versión 2/);
+});
+
+test('applyVocals carga las medidas en las pistas con el mismo nombre y tamaño', () => {
+  const text = JSON.stringify({
+    format: 'keymix-voces', version: 1, model: 'htdemucs',
+    tracks: {
+      'a.wav': { name: 'a.wav', size: 100, segSec: 3, seg: [-6, -6] },
+      'Sub/b.aiff': { name: 'b.aiff', size: 200, segSec: 3, seg: [-40] },
+      'c.wav': { name: 'c.wav', size: 999, segSec: 3, seg: [-6] },
+    },
+  });
+  const tracks = [
+    { name: 'a.wav', size: 100 },
+    { name: 'b.aiff', size: 200 },
+    { name: 'c.wav', size: 300 }, // mismo nombre, otro archivo: no se toca
+    { name: 'd.wav', size: 100 }, // no está en el archivo
+  ];
+  assert.equal(applyVocals(tracks, parseVocalsFile(text)), 2);
+  assert.deepEqual(tracks[0].vocals, { seg: [-6, -6], segSec: 3, model: 'htdemucs' });
+  assert.equal(classifyVocals(tracks[0].vocals).vocal, true);
+  assert.deepEqual(tracks[1].vocals, { seg: [-40], segSec: 3, model: 'htdemucs' });
+  assert.equal(tracks[2].vocals, undefined);
+  assert.equal(tracks[3].vocals, undefined);
+
+  // Volver a cargar el mismo archivo no cambia nada; una medida nueva sí cuenta.
+  const before = tracks[1].vocals;
+  assert.equal(applyVocals(tracks, parseVocalsFile(text)), 0);
+  assert.equal(tracks[1].vocals, before);
+  const updated = JSON.parse(text);
+  updated.tracks['a.wav'].seg = [-40, -40];
+  assert.equal(applyVocals(tracks, parseVocalsFile(JSON.stringify(updated))), 1);
+  assert.deepEqual(tracks[0].vocals.seg, [-40, -40]);
 });
